@@ -1,26 +1,15 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  release:
+    types: [published]
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create draft release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create ${{ github.ref_name }} --draft --generate-notes
-
   build-linux:
-    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -38,17 +27,16 @@ jobs:
             sh -c "shards install --production && shards build ark --static --release && strip bin/ark"
       - name: Package
         run: |
-          VERSION=${{ github.ref_name }}
+          VERSION=${{ github.event.release.tag_name }}
           ARCHIVE=ark-${VERSION}-${{ matrix.arch }}-linux-musl.tar.gz
           tar czf ${ARCHIVE} -C bin ark
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
       - name: Upload
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ github.ref_name }} ${{ env.ARCHIVE }}
+        run: gh release upload ${{ github.event.release.tag_name }} ${{ env.ARCHIVE }}
 
   build-macos:
-    needs: create-release
     strategy:
       fail-fast: false
       matrix:
@@ -65,17 +53,16 @@ jobs:
         run: shards install --production && shards build ark --release
       - name: Package
         run: |
-          VERSION=${{ github.ref_name }}
+          VERSION=${{ github.event.release.tag_name }}
           ARCHIVE=ark-${VERSION}-${{ matrix.arch }}-darwin.tar.gz
           tar czf ${ARCHIVE} -C bin ark
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
       - name: Upload
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ github.ref_name }} ${{ env.ARCHIVE }}
+        run: gh release upload ${{ github.event.release.tag_name }} ${{ env.ARCHIVE }}
 
   docker:
-    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,4 +79,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/crystal-autobot/ark:latest
-            ghcr.io/crystal-autobot/ark:${{ github.ref_name }}
+            ghcr.io/crystal-autobot/ark:${{ github.event.release.tag_name }}
