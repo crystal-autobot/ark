@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: crystallang/crystal:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: shards install
+      - name: Format check
+        run: crystal tool format --check src/ spec/
+      - name: Lint
+        run: ./bin/ameba src/
+      - name: Test
+        run: crystal spec
+
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: crystallang/crystal:latest-alpine
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: shards install --production
+      - name: Build release
+        run: crystal build src/main.cr -o bin/ark --release --no-debug --static

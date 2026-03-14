@@ -1,0 +1,6 @@
+require "./ark/version"
+require "./ark/config"
+require "./ark/aws/*"
+require "./ark/bedrock/*"
+require "./ark/slack/*"
+require "./ark/gateway"

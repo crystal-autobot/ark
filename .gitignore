@@ -1,0 +1,16 @@
+/bin/
+/lib/
+/.shards/
+/.crystal/
+/build/
+*.o
+*.a
+*.dwarf
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~

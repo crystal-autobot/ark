@@ -1,0 +1,26 @@
+name: ark
+version: 0.1.0
+
+authors:
+  - crystal-autobot
+
+crystal: ">= 1.10.0"
+
+license: MIT
+
+description: |
+  A Slack gateway for AWS Bedrock Agents via Socket Mode.
+
+dependencies:
+  awscr-signer:
+    github: taylorfinnell/awscr-signer
+    version: ~> 0.9
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: ~> 1.5
+
+targets:
+  ark:
+    main: src/main.cr

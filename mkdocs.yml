@@ -1,0 +1,65 @@
+site_name: Ark
+site_url: https://crystal-autobot.github.io/ark
+site_description: A Slack gateway for AWS Bedrock Agents via Socket Mode
+repo_url: https://github.com/crystal-autobot/ark
+repo_name: crystal-autobot/ark
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Slack app setup: getting-started/slack-app.md
+      - AWS setup: getting-started/aws-setup.md
+      - Configuration: getting-started/configuration.md
+      - Running: getting-started/running.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Message flow: architecture/message-flow.md
+      - Project structure: architecture/project-structure.md
+  - Deployment:
+      - Docker: deployment/docker.md
+      - ECS: deployment/ecs.md
+      - Systemd: deployment/systemd.md
+  - Development:
+      - Setup: development/setup.md
+      - Testing: development/testing.md
+      - Contributing: development/contributing.md
