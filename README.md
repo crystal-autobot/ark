@@ -58,27 +58,6 @@ docker run -e SLACK_BOT_TOKEN=... -e SLACK_APP_TOKEN=... \
 
 The image uses a multi-stage build (Crystal Alpine -> Alpine) with a static binary.
 
-## Project structure
+## Documentation
 
-```
-src/
-  main.cr                     # Entry point, config, signal handling
-  ark/
-    gateway.cr                # Slack Socket Mode event loop
-    config.cr                 # Environment variable configuration
-    slack/
-      client.cr               # Slack Web API client
-      socket_mode.cr          # Socket Mode WebSocket connection
-      mrkdwn.cr               # Markdown -> Slack mrkdwn conversion
-      block_kit.cr            # Block Kit table support
-      types.cr                # Constants and MIME type mapping
-    bedrock/
-      agent.cr                # Bedrock Agent client
-      event_stream.cr         # AWS binary event stream decoder
-      session.cr              # Session ID utilities
-      types.cr                # Request/response types
-    aws/
-      signer.cr               # AWS SigV4 signing (via awscr-signer)
-      credentials.cr          # AWS credential struct
-      firehose.cr             # Kinesis Firehose analytics publisher
-```
+Full documentation is available at [crystal-autobot.github.io/ark](https://crystal-autobot.github.io/ark).
