@@ -35,12 +35,11 @@ jobs:
       - name: Build static binary
         run: |
           docker run --rm -v $PWD:/src -w /src crystallang/crystal:latest-alpine \
-            sh -c "shards install --production && shards build ark --static --release"
+            sh -c "shards install --production && shards build ark --static --release && strip bin/ark"
       - name: Package
         run: |
           VERSION=${{ github.ref_name }}
           ARCHIVE=ark-${VERSION}-${{ matrix.arch }}-linux-musl.tar.gz
-          strip bin/ark
           tar czf ${ARCHIVE} -C bin ark
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
       - name: Upload
