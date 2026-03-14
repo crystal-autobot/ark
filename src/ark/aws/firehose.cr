@@ -57,7 +57,7 @@ module Ark::AWS
 
       response = client.exec(request)
       unless response.success?
-        Log.error { "firehose publish failed: #{response.status_code} #{response.body}" }
+        Log.error { "firehose publish failed: status=#{response.status_code}" }
       end
     rescue ex
       Log.error(exception: ex) { "firehose publish error" }

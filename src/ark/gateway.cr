@@ -177,6 +177,11 @@ module Ark
 
     private def fetch_file_bytes(url : String) : Bytes?
       uri = URI.parse(url)
+      unless uri.scheme == "https" && uri.host.try(&.ends_with?(".slack.com"))
+        Log.warn { "file download rejected: not a slack HTTPS URL" }
+        return nil
+      end
+
       client = HTTP::Client.new(uri)
       client.read_timeout = Slack::FILE_DOWNLOAD_TIMEOUT
 

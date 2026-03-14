@@ -97,7 +97,11 @@ module Ark::Slack
     end
 
     def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
-      # Step 1: get upload URL
+      if data.size > MAX_OUTPUT_FILE_SIZE
+        Log.warn { "skipping oversized output file: #{name} (#{data.size} bytes)" }
+        return
+      end
+
       resp = api_get("files.getUploadURLExternal", {
         "filename" => name,
         "length"   => data.size.to_s,

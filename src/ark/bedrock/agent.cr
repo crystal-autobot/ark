@@ -51,7 +51,8 @@ module Ark::Bedrock
 
       response = client.exec(request)
       unless response.success?
-        raise "bedrock invoke failed: #{response.status_code} #{response.body}"
+        Log.error { "bedrock invoke failed: status=#{response.status_code}" }
+        raise "bedrock agent invocation failed (#{response.status_code})"
       end
 
       parse_response(response)
