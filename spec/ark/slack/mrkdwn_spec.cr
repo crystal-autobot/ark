@@ -33,6 +33,28 @@ describe Ark::Slack::Mrkdwn do
     it "strips leading/trailing whitespace" do
       Ark::Slack::Mrkdwn.convert("  hello  ").should eq("hello")
     end
+
+    it "preserves content inside code blocks" do
+      input = "before **bold**\n```\n**not bold**\n~~not strike~~\n```\nafter **bold**"
+      result = Ark::Slack::Mrkdwn.convert(input)
+      result.should contain("*bold*")
+      result.should contain("**not bold**")
+      result.should contain("~~not strike~~")
+    end
+
+    it "handles multiple code blocks" do
+      input = "**a**\n```\n**b**\n```\n**c**\n```\n**d**\n```\n**e**"
+      result = Ark::Slack::Mrkdwn.convert(input)
+      result.should contain("*a*")
+      result.should contain("**b**")
+      result.should contain("*c*")
+      result.should contain("**d**")
+      result.should contain("*e*")
+    end
+
+    it "handles text with no code blocks" do
+      Ark::Slack::Mrkdwn.convert("**bold** and ~~strike~~").should eq("*bold* and ~strike~")
+    end
   end
 
   describe ".format_sources" do

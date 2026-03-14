@@ -129,7 +129,7 @@ describe Ark::Gateway do
       _, slack_api, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(dm_event("U999", "hello"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.size.should eq(1)
       agent.invocations[0][0].should eq("hello")
@@ -141,7 +141,7 @@ describe Ark::Gateway do
       _, _, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(dm_event("UBOT", "hello"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.should be_empty
     end
@@ -159,7 +159,7 @@ describe Ark::Gateway do
 
       _, _, socket_mode, agent, _ = build_gateway
       socket_mode.simulate_event(payload)
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.should be_empty
     end
@@ -168,7 +168,7 @@ describe Ark::Gateway do
       _, _, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(dm_event("U999", ""))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.should be_empty
     end
@@ -187,7 +187,7 @@ describe Ark::Gateway do
 
       _, _, socket_mode, agent, _ = build_gateway
       socket_mode.simulate_event(payload)
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.should be_empty
     end
@@ -196,7 +196,7 @@ describe Ark::Gateway do
       _, _, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(dm_event("U999", "hello", ts: "1.1", thread_ts: "0.9"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.size.should eq(1)
       agent.invocations[0][1].should eq("0.9")
@@ -206,7 +206,7 @@ describe Ark::Gateway do
       _, _, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(dm_event("U999", "hello", ts: "1.1"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.size.should eq(1)
       agent.invocations[0][1].should eq("1.1")
@@ -218,7 +218,7 @@ describe Ark::Gateway do
       _, slack_api, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(mention_event("U999", "<@UBOT> hello"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.size.should eq(1)
       agent.invocations[0][0].should eq("hello")
@@ -228,7 +228,7 @@ describe Ark::Gateway do
       _, _, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(mention_event("U999", "<@UBOT>"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.should be_empty
     end
@@ -237,7 +237,7 @@ describe Ark::Gateway do
       _, _, socket_mode, agent, _ = build_gateway
 
       socket_mode.simulate_event(mention_event("UBOT", "<@UBOT> hello"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       agent.invocations.should be_empty
     end
@@ -249,7 +249,7 @@ describe Ark::Gateway do
       agent.should_raise = true
 
       socket_mode.simulate_event(dm_event("U999", "hello"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       slack_api.messages.any? { |m| m[1] == Ark::Slack::ERROR_REPLY_TEXT }.should be_true
     end
@@ -263,7 +263,7 @@ describe Ark::Gateway do
       )
 
       socket_mode.simulate_event(dm_event("U999", "hello"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       slack_api.block_messages.size.should eq(1)
     end
@@ -276,7 +276,7 @@ describe Ark::Gateway do
       )
 
       socket_mode.simulate_event(dm_event("U999", "hello"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       slack_api.messages.size.should eq(1)
       slack_api.messages[0][1].should contain("Sources")
@@ -289,9 +289,9 @@ describe Ark::Gateway do
       _, slack_api, socket_mode, _, _ = build_gateway
 
       socket_mode.simulate_event(dm_event("U999", "one"))
-      Fiber.yield
+      2.times { Fiber.yield }
       socket_mode.simulate_event(dm_event("U999", "two"))
-      Fiber.yield
+      2.times { Fiber.yield }
 
       slack_api.user_info_calls.size.should eq(1)
     end

@@ -5,15 +5,14 @@ module Ark::Slack::Mrkdwn
   LINK_RE        = /\[([^\]]+)\]\(([^)]+)\)/
   HEADING_RE     = Regex.new(%q(^\#{1,6}\s+([^\n]+)$), Regex::Options::MULTILINE)
   BLANK_LINES_RE = /\n{3,}/
+  CODE_FENCE_RE  = /```[\s\S]*?```/
 
-  # Converts common markdown to Slack mrkdwn format.
+  # Converts common markdown to Slack mrkdwn format, preserving code blocks.
   def self.convert(text : String) : String
-    text = text.gsub(BOLD_RE, "*\\1*")
-    text = text.gsub(STRIKE_RE, "~\\1~")
-    text = text.gsub(LINK_RE, "<\\2|\\1>")
-    text = text.gsub(HEADING_RE, "*\\1*")
-    text = text.gsub(BLANK_LINES_RE, "\n\n")
-    text.strip
+    parts = split_code_blocks(text)
+    parts.map_with_index do |part, index|
+      index.odd? ? part : convert_prose(part)
+    end.join.strip
   end
 
   # Renders source names as a bulleted list.
@@ -52,16 +51,40 @@ module Ark::Slack::Mrkdwn
     parts
   end
 
+  # Splits text into alternating [prose, code, prose, code, ...] segments.
+  # Odd indices are code blocks (preserved as-is).
+  private def self.split_code_blocks(text : String) : Array(String)
+    parts = [] of String
+    last_end = 0
+
+    text.scan(CODE_FENCE_RE) do |match|
+      match_start = text.index(match[0], last_end)
+      next unless match_start
+
+      parts << text[last_end...match_start]
+      parts << match[0]
+      last_end = match_start + match[0].size
+    end
+
+    parts << text[last_end..]
+    parts
+  end
+
+  private def self.convert_prose(text : String) : String
+    text = text.gsub(BOLD_RE, "*\\1*")
+    text = text.gsub(STRIKE_RE, "~\\1~")
+    text = text.gsub(LINK_RE, "<\\2|\\1>")
+    text = text.gsub(HEADING_RE, "*\\1*")
+    text.gsub(BLANK_LINES_RE, "\n\n")
+  end
+
   private def self.find_split_point(text : String, max_len : Int32) : Int32
-    # Try double-newline first
     cut = text[0, max_len].rindex("\n\n")
     return cut if cut && cut > 0
 
-    # Fall back to single newline
     cut = text[0, max_len].rindex('\n')
     return cut if cut && cut > 0
 
-    # Hard cut
     max_len
   end
 end

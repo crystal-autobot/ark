@@ -7,6 +7,7 @@ module Ark::Slack
     RECONNECT_DELAY = 5.seconds
 
     @running = true
+    @ws : HTTP::WebSocket?
 
     def initialize(@app_token : String)
     end
@@ -16,6 +17,7 @@ module Ark::Slack
         begin
           ws_url = open_connection
           ws = HTTP::WebSocket.new(URI.parse(ws_url))
+          @ws = ws
 
           Log.info { "socket mode: connected" }
 
@@ -29,7 +31,9 @@ module Ark::Slack
 
           ws.run
         rescue ex
-          Log.error(exception: ex) { "socket mode: connection error" }
+          Log.error(exception: ex) { "socket mode: connection error" } if @running
+        ensure
+          @ws = nil
         end
 
         break unless @running
@@ -40,6 +44,7 @@ module Ark::Slack
 
     def stop : Nil
       @running = false
+      @ws.try(&.close)
     end
 
     private def open_connection : String
@@ -58,12 +63,10 @@ module Ark::Slack
     private def handle_message(ws : HTTP::WebSocket, raw : String, handler : JSON::Any ->) : Nil
       json = JSON.parse(raw)
 
-      # Acknowledge the envelope
       if envelope_id = json["envelope_id"]?.try(&.as_s?)
         ws.send({envelope_id: envelope_id}.to_json)
       end
 
-      # Only process events_api payloads
       type = json["type"]?.try(&.as_s?)
       return unless type == "events_api"
 

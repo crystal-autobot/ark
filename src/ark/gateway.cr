@@ -11,8 +11,6 @@ module Ark
     )
       @bot_user_id = ""
       @users = {} of String => Hash(String, String)
-      @http_client = HTTP::Client.new("slack.com", tls: true)
-      @http_client.read_timeout = Slack::FILE_DOWNLOAD_TIMEOUT
     end
 
     def run : Nil
@@ -59,7 +57,7 @@ module Ark
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
 
-      respond(user, channel, text, thread_ts, thread_ts, files)
+      spawn { respond(user, channel, text, thread_ts, thread_ts, files) }
     end
 
     private def valid_dm?(event : JSON::Any) : Bool
@@ -88,7 +86,7 @@ module Ark
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
 
-      respond(user, channel, text, thread_ts, thread_ts, [] of Bedrock::InputFile)
+      spawn { respond(user, channel, text, thread_ts, thread_ts, [] of Bedrock::InputFile) }
     end
 
     private def respond(

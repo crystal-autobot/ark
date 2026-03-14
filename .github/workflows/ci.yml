@@ -31,4 +31,4 @@ jobs:
       - name: Install dependencies
         run: shards install --production
       - name: Build release
-        run: crystal build src/main.cr -o bin/ark --release --no-debug --static
+        run: mkdir -p bin && crystal build src/main.cr -o bin/ark --release --no-debug --static

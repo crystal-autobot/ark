@@ -1,9 +1,11 @@
 .PHONY: build release test lint format format-check docker clean help
 
 build: ## Build debug binary
+	@mkdir -p bin
 	crystal build src/main.cr -o bin/ark
 
 release: ## Build optimized binary
+	@mkdir -p bin
 	crystal build src/main.cr -o bin/ark --release --no-debug
 
 test: ## Run specs

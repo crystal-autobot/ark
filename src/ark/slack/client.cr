@@ -29,7 +29,10 @@ module Ark::Slack
   end
 
   class Client < SlackAPI
-    API_BASE = "https://slack.com/api"
+    API_BASE        = "https://slack.com/api"
+    MAX_RETRIES     = 3
+    DEFAULT_RETRY   = 1.seconds
+    RATE_LIMIT_CODE = 429
 
     def initialize(@bot_token : String)
     end
@@ -121,11 +124,13 @@ module Ark::Slack
         "Authorization" => "Bearer #{@bot_token}",
         "Content-Type"  => "application/json; charset=utf-8",
       }
-      HTTP::Client.post(
-        "#{API_BASE}/#{method}",
-        headers: headers,
-        body: (body || {} of String => String).to_json,
-      )
+      with_rate_limit do
+        HTTP::Client.post(
+          "#{API_BASE}/#{method}",
+          headers: headers,
+          body: (body || {} of String => String).to_json,
+        )
+      end
     end
 
     private def api_post_json(method : String, body : String) : HTTP::Client::Response
@@ -133,13 +138,29 @@ module Ark::Slack
         "Authorization" => "Bearer #{@bot_token}",
         "Content-Type"  => "application/json; charset=utf-8",
       }
-      HTTP::Client.post("#{API_BASE}/#{method}", headers: headers, body: body)
+      with_rate_limit do
+        HTTP::Client.post("#{API_BASE}/#{method}", headers: headers, body: body)
+      end
     end
 
     private def api_get(method : String, params : Hash(String, String)) : HTTP::Client::Response
       query = URI::Params.encode(params)
       headers = HTTP::Headers{"Authorization" => "Bearer #{@bot_token}"}
-      HTTP::Client.get("#{API_BASE}/#{method}?#{query}", headers: headers)
+      with_rate_limit do
+        HTTP::Client.get("#{API_BASE}/#{method}?#{query}", headers: headers)
+      end
+    end
+
+    private def with_rate_limit(& : -> HTTP::Client::Response) : HTTP::Client::Response
+      MAX_RETRIES.times do
+        resp = yield
+        return resp unless resp.status_code == RATE_LIMIT_CODE
+
+        retry_after = resp.headers["Retry-After"]?.try(&.to_i?) || DEFAULT_RETRY.total_seconds.to_i
+        Log.warn { "slack rate limited, retrying in #{retry_after}s" }
+        sleep retry_after.seconds
+      end
+      yield
     end
 
     private def parse_response(resp : HTTP::Client::Response) : JSON::Any
