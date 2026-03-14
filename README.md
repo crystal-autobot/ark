@@ -24,15 +24,15 @@ All configuration is via environment variables:
 | `SLACK_APP_TOKEN` | yes | Slack app-level token for Socket Mode (`xapp-...`) |
 | `BEDROCK_AGENT_ID` | yes | AWS Bedrock Agent ID |
 | `BEDROCK_AGENT_ALIAS_ID` | yes | AWS Bedrock Agent Alias ID |
-| `AWS_PROFILE` | * | AWS profile name from `~/.aws/credentials` |
-| `AWS_ACCESS_KEY_ID` | * | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | * | AWS secret key |
+| `AWS_PROFILE` | no | AWS profile name (supports SSO, assume-role) |
+| `AWS_ACCESS_KEY_ID` | no | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | no | AWS secret key |
 | `AWS_SESSION_TOKEN` | no | AWS session token (for temporary credentials) |
 | `AWS_REGION` | no | AWS region (default: `us-east-1`, or from profile config) |
 | `FIREHOSE_STREAM_NAME` | no | Kinesis Firehose delivery stream for analytics |
 | `LOG_LEVEL` | no | Log level: `debug`, `info`, `warn`, `error` (default: `info`) |
 
-\* Either `AWS_PROFILE` or both `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` must be set. Explicit keys take priority over profile. When using `AWS_PROFILE`, credentials are read from `~/.aws/credentials` and region from `~/.aws/config`.
+AWS credentials are resolved automatically: explicit keys > ECS task role > AWS CLI (SSO, assume-role, instance profile).
 
 ## Development
 
@@ -52,7 +52,6 @@ Environment variables in your shell take precedence over `.env` values.
 docker build -t ark .
 docker run -e SLACK_BOT_TOKEN=... -e SLACK_APP_TOKEN=... \
   -e BEDROCK_AGENT_ID=... -e BEDROCK_AGENT_ALIAS_ID=... \
-  -e AWS_ACCESS_KEY_ID=... -e AWS_SECRET_ACCESS_KEY=... \
   ark
 ```
 

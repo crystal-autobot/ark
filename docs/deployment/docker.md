@@ -21,32 +21,7 @@ docker run \
   ark
 ```
 
-### With a profile (mount AWS config)
-
-```sh
-docker run \
-  -e SLACK_BOT_TOKEN=xoxb-... \
-  -e SLACK_APP_TOKEN=xapp-... \
-  -e BEDROCK_AGENT_ID=... \
-  -e BEDROCK_AGENT_ALIAS_ID=... \
-  -e AWS_PROFILE=my-profile \
-  -v ~/.aws:/home/ark/.aws:ro \
-  ark
-```
-
-### With analytics
-
-```sh
-docker run \
-  -e SLACK_BOT_TOKEN=xoxb-... \
-  -e SLACK_APP_TOKEN=xapp-... \
-  -e BEDROCK_AGENT_ID=... \
-  -e BEDROCK_AGENT_ALIAS_ID=... \
-  -e AWS_ACCESS_KEY_ID=... \
-  -e AWS_SECRET_ACCESS_KEY=... \
-  -e FIREHOSE_STREAM_NAME=ark-analytics \
-  ark
-```
+On ECS with a task role, omit the AWS key variables — credentials are resolved automatically via the container metadata endpoint.
 
 ## Image details
 

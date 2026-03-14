@@ -72,7 +72,7 @@ The task role needs Bedrock invoke permissions and optionally Firehose:
 }
 ```
 
-When running on ECS with a task role, you don't need `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` — the task role credentials are available automatically. However, since Ark uses direct HTTP calls with SigV4 (not the AWS SDK), you'll need to set explicit keys or use an IAM user.
+When running on ECS with a task role, you don't need `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`. Ark reads the ECS container metadata endpoint (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`) automatically to resolve task role credentials.
 
 ## Resource requirements
 

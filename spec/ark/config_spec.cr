@@ -87,20 +87,21 @@ describe Ark::Config do
       end
     end
 
-    it "raises when no AWS credentials strategy is provided" do
+    it "loads config with no AWS keys or profile (defers to CLI)" do
       env_vars = {
         "SLACK_BOT_TOKEN"        => "xoxb-test",
         "SLACK_APP_TOKEN"        => "xapp-test",
         "BEDROCK_AGENT_ID"       => "agent-123",
         "BEDROCK_AGENT_ALIAS_ID" => "alias-456",
       }
-      %w[AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_PROFILE].each { |key| ENV.delete(key) }
+      %w[AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_PROFILE FIREHOSE_STREAM_NAME].each { |key| ENV.delete(key) }
       env_vars.each { |key, val| ENV[key] = val }
 
       begin
-        expect_raises(ArgumentError, /AWS credentials required/) do
-          Ark::Config.load
-        end
+        config = Ark::Config.load
+        config.aws_access_key_id.should be_nil
+        config.aws_secret_access_key.should be_nil
+        config.aws_profile.should be_nil
       ensure
         env_vars.each_key { |key| ENV.delete(key) }
       end

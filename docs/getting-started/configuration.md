@@ -13,23 +13,19 @@ All configuration is via environment variables. Ark also reads a `.env` file fro
 | `BEDROCK_AGENT_ID` | AWS Bedrock Agent ID |
 | `BEDROCK_AGENT_ALIAS_ID` | AWS Bedrock Agent Alias ID |
 
-### AWS credentials (one of these is required)
-
-| Variable | Description |
-|---|---|
-| `AWS_PROFILE` | Profile name from `~/.aws/credentials` |
-| `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` | Explicit AWS keys |
-
-Explicit keys take priority over profile. See [AWS setup](aws-setup.md) for details.
-
 ### Optional
 
 | Variable | Default | Description |
 |---|---|---|
+| `AWS_PROFILE` | — | AWS profile name (supports SSO, assume-role) |
+| `AWS_ACCESS_KEY_ID` | — | AWS access key (takes priority over profile) |
+| `AWS_SECRET_ACCESS_KEY` | — | AWS secret key |
 | `AWS_SESSION_TOKEN` | — | AWS session token for temporary credentials |
 | `AWS_REGION` | `us-east-1` | AWS region (overridden by profile config if using `AWS_PROFILE`) |
 | `FIREHOSE_STREAM_NAME` | — | Kinesis Firehose stream for analytics (disabled if not set) |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+
+AWS credentials are resolved automatically. See [credential resolution](#credential-resolution-order) below.
 
 ## Example `.env` file
 
@@ -58,8 +54,8 @@ LOG_LEVEL=info
 ## Credential resolution order
 
 1. If `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are set, use them
-2. If `AWS_PROFILE` is set, read credentials from `~/.aws/credentials`
-3. If neither is set, Ark exits with an error
+2. If running on ECS, read task role credentials from the container metadata endpoint
+3. Otherwise, use the AWS CLI (`aws configure export-credentials`) — supports SSO, assume-role, instance profiles
 
 ## Region resolution order
 

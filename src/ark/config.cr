@@ -54,16 +54,6 @@ module Ark
         raise ArgumentError.new("missing required env vars: #{missing.join(", ")}")
       end
 
-      aws_profile = env("AWS_PROFILE")
-      aws_access_key_id = env("AWS_ACCESS_KEY_ID")
-      aws_secret_access_key = env("AWS_SECRET_ACCESS_KEY")
-
-      if aws_profile.nil? && (aws_access_key_id.nil? || aws_secret_access_key.nil?)
-        raise ArgumentError.new(
-          "AWS credentials required: set AWS_PROFILE or both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
-        )
-      end
-
       new(
         slack_bot_token: values["SLACK_BOT_TOKEN"],
         slack_app_token: values["SLACK_APP_TOKEN"],
@@ -71,9 +61,9 @@ module Ark
         bedrock_agent_alias_id: values["BEDROCK_AGENT_ALIAS_ID"],
         firehose_stream_name: env("FIREHOSE_STREAM_NAME"),
         aws_region: env("AWS_REGION", DEFAULT_AWS_REGION).as(String),
-        aws_profile: aws_profile,
-        aws_access_key_id: aws_access_key_id,
-        aws_secret_access_key: aws_secret_access_key,
+        aws_profile: env("AWS_PROFILE"),
+        aws_access_key_id: env("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key: env("AWS_SECRET_ACCESS_KEY"),
         aws_session_token: env("AWS_SESSION_TOKEN"),
         log_level: env("LOG_LEVEL", DEFAULT_LOG_LEVEL).as(String),
       )
