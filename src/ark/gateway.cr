@@ -2,6 +2,9 @@ require "http/client"
 
 module Ark
   class Gateway
+    MAX_CONCURRENT_REQUESTS = 10
+    BUSY_REPLY_TEXT         = "I'm currently handling too many requests. Please try again in a moment."
+
     def initialize(
       @slack_api : Slack::SlackAPI,
       @socket_mode : Slack::SocketMode,
@@ -11,6 +14,8 @@ module Ark
     )
       @bot_user_id = ""
       @users = {} of String => Hash(String, String)
+      @semaphore = Channel(Nil).new(MAX_CONCURRENT_REQUESTS)
+      MAX_CONCURRENT_REQUESTS.times { @semaphore.send(nil) }
     end
 
     def run : Nil
@@ -57,7 +62,7 @@ module Ark
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
 
-      spawn { respond(user, channel, text, thread_ts, thread_ts, files) }
+      spawn { throttled_respond(user, channel, text, thread_ts, thread_ts, files) }
     end
 
     private def valid_dm?(event : JSON::Any) : Bool
@@ -86,7 +91,28 @@ module Ark
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
 
-      spawn { respond(user, channel, text, thread_ts, thread_ts, [] of Bedrock::InputFile) }
+      spawn { throttled_respond(user, channel, text, thread_ts, thread_ts, [] of Bedrock::InputFile) }
+    end
+
+    private def throttled_respond(
+      user_id : String,
+      channel : String,
+      text : String,
+      thread_ts : String,
+      session_id : String,
+      files : Array(Bedrock::InputFile),
+    ) : Nil
+      select
+      when @semaphore.receive
+        begin
+          respond(user_id, channel, text, thread_ts, session_id, files)
+        ensure
+          @semaphore.send(nil)
+        end
+      else
+        Log.warn { "request dropped: concurrency limit reached user=#{user_id}" }
+        @slack_api.post_message(channel, BUSY_REPLY_TEXT, thread_ts)
+      end
     end
 
     private def respond(
