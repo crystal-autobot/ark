@@ -4,7 +4,7 @@ require "file_utils"
 describe Ark::AWS::Credentials do
   describe ".from_cli" do
     it "raises when aws CLI is not available or profile fails" do
-      expect_raises(Exception, /failed to export AWS credentials/) do
+      expect_raises(Exception, /AWS/) do
         Ark::AWS::Credentials.from_cli("nonexistent-profile-#{Random.new.hex(8)}")
       end
     end

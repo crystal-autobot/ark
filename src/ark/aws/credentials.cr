@@ -51,7 +51,12 @@ module Ark::AWS
 
       output = IO::Memory.new
       error = IO::Memory.new
-      status = Process.run("aws", args, output: output, error: error)
+
+      begin
+        status = Process.run("aws", args, output: output, error: error)
+      rescue File::NotFoundError
+        raise "AWS CLI not found. Install it or provide AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY"
+      end
 
       unless status.success?
         label = profile ? "profile [#{profile}]" : "default chain"
