@@ -9,7 +9,7 @@ crystal: ">= 1.10.0"
 license: MIT
 
 description: |
-  A Slack gateway for AWS Bedrock Agents via Socket Mode.
+  A lightweight, high-performance Slack gateway for AWS Bedrock Agents.
 
 dependencies:
   awscr-signer:

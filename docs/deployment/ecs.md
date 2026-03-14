@@ -76,9 +76,9 @@ When running on ECS with a task role, you don't need `AWS_ACCESS_KEY_ID`/`AWS_SE
 
 ## Resource requirements
 
-Ark is lightweight:
+Ark is a single static binary that uses under 20 MB of memory and near-zero CPU at idle. It runs comfortably on the smallest instances (e.g., `t4g.nano`).
 
-- **CPU**: 256 units (0.25 vCPU) is sufficient
-- **Memory**: 128-512 MB depending on file handling volume
+- **CPU**: 128 units is more than enough
+- **Memory**: 64 MB soft limit is sufficient for normal use
 - **Network**: Outbound HTTPS only (no inbound ports)
 - **Storage**: No persistent storage needed

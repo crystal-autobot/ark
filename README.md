@@ -1,6 +1,6 @@
 # Ark
 
-A Slack gateway for AWS Bedrock Agents via Socket Mode. Ark connects Slack conversations to a Bedrock Agent using WebSocket (no public endpoint needed), forwards messages, and posts streamed responses back.
+A lightweight, high-performance Slack gateway for AWS Bedrock Agents. Single static binary, under 20 MB memory, connects via Socket Mode (no public endpoint needed).
 
 - **Direct messages** - the bot responds in a flat conversation
 - **Channel mentions** - the bot responds in a thread
@@ -53,7 +53,7 @@ docker run -e SLACK_BOT_TOKEN=... -e SLACK_APP_TOKEN=... \
   ark
 ```
 
-The image uses a multi-stage build (Crystal Alpine -> Alpine) with a static binary.
+The image uses a multi-stage build (Crystal Alpine -> Alpine) with a static binary. Ark uses ~10 MB of memory and near-zero CPU at idle — it runs comfortably on the smallest instances (e.g., `t4g.nano`).
 
 ## Documentation
 

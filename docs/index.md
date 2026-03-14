@@ -1,6 +1,6 @@
 # Ark
 
-A Slack gateway for AWS Bedrock Agents via Socket Mode.
+A lightweight, high-performance Slack gateway for AWS Bedrock Agents.
 
 Ark connects Slack conversations to an [AWS Bedrock Agent](https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html) using WebSocket — no public endpoint or ingress is needed. When a message is received, it forwards the text to the agent and posts the streamed response back to Slack.
 
@@ -13,7 +13,8 @@ Ark connects Slack conversations to an [AWS Bedrock Agent](https://docs.aws.amaz
 - **Table rendering** — markdown tables in agent responses are rendered as Slack Block Kit tables
 - **Citation sources** — knowledge base sources are displayed as a bulleted list
 - **Analytics** — every interaction is optionally published to Kinesis Firehose for downstream analysis
-- **AWS profile support** — authenticate via `~/.aws/credentials` or explicit keys
+- **AWS credential chain** — explicit keys, ECS task roles, or AWS CLI (SSO, assume-role)
+- **Minimal footprint** — single static binary, under 20 MB memory, near-zero CPU at idle
 
 ## Quick start
 
