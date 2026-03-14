@@ -9,10 +9,8 @@ Slack thread timestamps are used as Bedrock session IDs, so follow-up messages i
 
 ## Prerequisites
 
-- Crystal 1.10+
 - A Slack app with Socket Mode enabled and scopes: `app_mentions:read`, `chat:write`, `im:history`, `reactions:write`
 - An AWS Bedrock Agent with an alias
-- AWS credentials with Bedrock access (and optionally Firehose)
 
 ## Configuration
 
