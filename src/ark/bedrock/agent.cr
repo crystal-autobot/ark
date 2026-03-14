@@ -150,11 +150,20 @@ module Ark::Bedrock
       json = JSON.parse(String.new(payload))
       json["files"]?.try(&.as_a).try &.each do |file|
         data_b64 = file["bytes"]?.try(&.as_s?) || next
+        name = file["name"]?.try(&.as_s?) || "file"
+
+        # Reject before decoding: base64 is ~4/3x raw size
+        estimated_size = data_b64.bytesize * 3 // 4
+        if estimated_size > Slack::MAX_OUTPUT_FILE_SIZE
+          Log.warn { "skipping oversized agent file before decode: #{name} (~#{estimated_size} bytes)" }
+          next
+        end
+
         data = Base64.decode(data_b64)
         next if data.empty?
 
         output_files << AgentFile.new(
-          name: file["name"]?.try(&.as_s?) || "file",
+          name: name,
           media_type: file["type"]?.try(&.as_s?) || "application/octet-stream",
           data: data,
         )
