@@ -88,7 +88,7 @@ module Ark::AWS
       new(
         access_key_id: access_key,
         secret_access_key: secret_key,
-        session_token: json["SessionToken"]?.try(&.as_s?),
+        session_token: json["SessionToken"]?.try(&.as_s?) || json["Token"]?.try(&.as_s?),
       )
     end
 
