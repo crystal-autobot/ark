@@ -35,18 +35,23 @@ module Ark::Bedrock
       end
     end
 
+    # 16 MB — generous upper bound; Bedrock frames are typically < 1 MB.
+    MAX_FRAME_SIZE = 16 * 1024 * 1024
+
     def self.decode(io : IO, & : Message ->) : Nil
       loop do
-        # Read prelude: total_length (4) + headers_length (4) + prelude_crc (4) = 12 bytes
         prelude = Bytes.new(12)
         bytes_read = io.read_fully?(prelude)
         break if bytes_read.nil?
 
         total_length = read_uint32(prelude, 0)
         headers_length = read_uint32(prelude, 4)
-        # Skip prelude CRC (bytes 8..11)
 
-        # Remaining bytes after prelude: total - 12 (prelude) - 4 (message CRC)
+        if total_length > MAX_FRAME_SIZE
+          Log.warn { "event stream frame too large: #{total_length} bytes, skipping" }
+          break
+        end
+
         remaining = total_length.to_i32 - 12 - 4
         break if remaining < 0
 

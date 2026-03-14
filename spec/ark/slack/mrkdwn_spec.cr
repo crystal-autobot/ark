@@ -57,6 +57,49 @@ describe Ark::Slack::Mrkdwn do
     end
   end
 
+  describe ".sanitize" do
+    it "escapes <!channel> broadcast" do
+      Ark::Slack::Mrkdwn.sanitize("alert <!channel> now").should eq("alert &lt;!channel&gt; now")
+    end
+
+    it "escapes <!here> broadcast" do
+      Ark::Slack::Mrkdwn.sanitize("hey <!here>").should eq("hey &lt;!here&gt;")
+    end
+
+    it "escapes <!everyone> broadcast" do
+      Ark::Slack::Mrkdwn.sanitize("<!everyone> listen").should eq("&lt;!everyone&gt; listen")
+    end
+
+    it "escapes user mentions" do
+      Ark::Slack::Mrkdwn.sanitize("ask <@U1234ABC>").should eq("ask &lt;@U1234ABC&gt;")
+    end
+
+    it "escapes multiple tokens" do
+      input = "<!channel> and <@U123> and <!here>"
+      result = Ark::Slack::Mrkdwn.sanitize(input)
+      result.should_not contain("<!channel>")
+      result.should_not contain("<@U123>")
+      result.should_not contain("<!here>")
+    end
+
+    it "preserves normal text" do
+      Ark::Slack::Mrkdwn.sanitize("hello world").should eq("hello world")
+    end
+  end
+
+  describe ".convert" do
+    it "neutralizes broadcast tokens in output" do
+      result = Ark::Slack::Mrkdwn.convert("Sure! <!channel> please read this")
+      result.should_not contain("<!channel>")
+      result.should contain("&lt;!channel&gt;")
+    end
+
+    it "neutralizes user mentions in output" do
+      result = Ark::Slack::Mrkdwn.convert("Contact <@U999ZZZ> for help")
+      result.should_not contain("<@U999ZZZ>")
+    end
+  end
+
   describe ".format_sources" do
     it "formats single source" do
       result = Ark::Slack::Mrkdwn.format_sources(["doc.pdf"])

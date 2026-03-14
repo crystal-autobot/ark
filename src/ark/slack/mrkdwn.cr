@@ -7,12 +7,24 @@ module Ark::Slack::Mrkdwn
   BLANK_LINES_RE = /\n{3,}/
   CODE_FENCE_RE  = /```[\s\S]*?```/
 
+  # Slack control tokens that could trigger mass notifications or impersonate mentions.
+  BROADCAST_RE    = /<!(?:channel|here|everyone)>/
+  USER_MENTION_RE = /<@[A-Z0-9]+>/
+
   # Converts common markdown to Slack mrkdwn format, preserving code blocks.
+  # Neutralizes Slack control tokens to prevent mention/broadcast injection.
   def self.convert(text : String) : String
+    text = sanitize(text)
     parts = split_code_blocks(text)
     parts.map_with_index do |part, index|
       index.odd? ? part : convert_prose(part)
     end.join.strip
+  end
+
+  # Escapes Slack control tokens that could trigger notifications or impersonate users.
+  def self.sanitize(text : String) : String
+    text = text.gsub(BROADCAST_RE) { |match| match.gsub('<', "&lt;").gsub('>', "&gt;") }
+    text.gsub(USER_MENTION_RE) { |match| match.gsub('<', "&lt;").gsub('>', "&gt;") }
   end
 
   # Renders source names as a bulleted list.
