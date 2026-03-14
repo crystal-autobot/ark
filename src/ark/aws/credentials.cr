@@ -1,3 +1,5 @@
+require "json"
+
 module Ark::AWS
   struct Credentials
     getter access_key_id : String
@@ -7,7 +9,7 @@ module Ark::AWS
     def initialize(@access_key_id : String, @secret_access_key : String, @session_token : String? = nil)
     end
 
-    # Resolves credentials from config: explicit keys take priority, then profile.
+    # Resolves credentials: explicit keys > AWS CLI export (supports SSO, assume-role, etc.)
     def self.from_config(config : Config) : Credentials
       if (key_id = config.aws_access_key_id) && (secret = config.aws_secret_access_key)
         return new(
@@ -18,31 +20,36 @@ module Ark::AWS
       end
 
       if profile = config.aws_profile
-        return from_profile(profile)
+        return from_cli(profile)
       end
 
       raise "no AWS credentials: set AWS_PROFILE or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY"
     end
 
-    # Reads credentials from ~/.aws/credentials for the given profile.
-    def self.from_profile(profile : String) : Credentials
-      credentials_path = File.join(aws_config_dir, "credentials")
-      unless File.exists?(credentials_path)
-        raise "AWS credentials file not found: #{credentials_path}"
+    # Uses the AWS CLI to export credentials for any profile type (SSO, assume-role, static, etc.)
+    def self.from_cli(profile : String) : Credentials
+      output = IO::Memory.new
+      error = IO::Memory.new
+      status = Process.run("aws", ["configure", "export-credentials", "--profile", profile],
+        output: output, error: error)
+
+      unless status.success?
+        msg = error.to_s.strip
+        raise "failed to export AWS credentials for profile [#{profile}]: #{msg}"
       end
 
-      section = parse_ini_section(credentials_path, profile)
-      access_key = section["aws_access_key_id"]?
-      secret_key = section["aws_secret_access_key"]?
+      json = JSON.parse(output.to_s)
+      access_key = json["AccessKeyId"]?.try(&.as_s?)
+      secret_key = json["SecretAccessKey"]?.try(&.as_s?)
 
       unless access_key && secret_key
-        raise "profile [#{profile}] missing aws_access_key_id or aws_secret_access_key in #{credentials_path}"
+        raise "AWS CLI returned incomplete credentials for profile [#{profile}]"
       end
 
       new(
         access_key_id: access_key,
         secret_access_key: secret_key,
-        session_token: section["aws_session_token"]?,
+        session_token: json["SessionToken"]?.try(&.as_s?),
       )
     end
 
@@ -51,7 +58,6 @@ module Ark::AWS
       config_path = File.join(aws_config_dir, "config")
       return nil unless File.exists?(config_path)
 
-      # In ~/.aws/config, non-default profiles use "profile <name>" as section header.
       section_name = profile == "default" ? "default" : "profile #{profile}"
       section = parse_ini_section(config_path, section_name)
       section["region"]?

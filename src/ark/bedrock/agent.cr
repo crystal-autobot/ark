@@ -13,7 +13,8 @@ module Ark::Bedrock
   end
 
   class Agent < AgentInvoker
-    SERVICE         = "bedrock-agent-runtime"
+    ENDPOINT_PREFIX = "bedrock-agent-runtime"
+    SIGNING_SERVICE = "bedrock"
     CONNECT_TIMEOUT = 30.seconds
     READ_TIMEOUT    = 300.seconds
 
@@ -25,7 +26,7 @@ module Ark::Bedrock
       @region : String,
       @credentials : AWS::Credentials,
     )
-      @signer = AWS::Signer.new(SERVICE, @region, @credentials)
+      @signer = AWS::Signer.new(SIGNING_SERVICE, @region, @credentials)
     end
 
     def invoke(
@@ -41,7 +42,7 @@ module Ark::Bedrock
       uri = endpoint_uri(session_id)
 
       request = HTTP::Request.new("POST", uri.request_target, body: body)
-      request.headers["Host"] = uri.host || "#{SERVICE}.#{@region}.amazonaws.com"
+      request.headers["Host"] = uri.host || "#{ENDPOINT_PREFIX}.#{@region}.amazonaws.com"
       request.headers["Content-Type"] = "application/json"
       @signer.sign(request)
 
@@ -60,7 +61,7 @@ module Ark::Bedrock
 
     private def endpoint_uri(session_id : String) : URI
       URI.parse(
-        "https://#{SERVICE}.#{@region}.amazonaws.com" \
+        "https://#{ENDPOINT_PREFIX}.#{@region}.amazonaws.com" \
         "/agents/#{@agent_id}/agentAliases/#{@alias_id}" \
         "/sessions/#{session_id}/text"
       )
