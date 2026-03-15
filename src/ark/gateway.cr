@@ -190,7 +190,12 @@ module Ark
     private def inject_thread_context(channel : String, thread_ts : String, text : String) : String
       replies = @slack_api.get_thread_replies(channel, thread_ts, THREAD_REPLIES_LIMIT)
       context = Slack::ThreadContext.format(replies, @bot_user_id)
-      context ? "#{context}\n\n#{text}" : text
+      if context
+        Log.info { "restoring thread context channel=#{channel} thread=#{thread_ts} replies=#{replies.size} context_size=#{context.size}" }
+        "#{context}\n\n#{text}"
+      else
+        text
+      end
     rescue ex
       Log.warn(exception: ex) { "failed to fetch thread context channel=#{channel} thread=#{thread_ts}" }
       text
