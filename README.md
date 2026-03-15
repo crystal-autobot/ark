@@ -5,11 +5,11 @@ A lightweight, high-performance Slack gateway for AWS Bedrock Agents. Single sta
 - **Direct messages** - the bot responds in a flat conversation
 - **Channel mentions** - the bot responds in a thread
 
-Slack thread timestamps are used as Bedrock session IDs, so follow-up messages in the same thread maintain conversation context.
+Slack thread timestamps are used as Bedrock session IDs, so follow-up messages in the same thread maintain conversation context. When a Bedrock session expires (1 hour idle), Ark automatically restores context from the Slack thread history.
 
 ## Prerequisites
 
-- A Slack app with Socket Mode enabled and scopes: `app_mentions:read`, `chat:write`, `im:history`, `reactions:write`
+- A Slack app with Socket Mode enabled and scopes: `app_mentions:read`, `channels:history`, `chat:write`, `files:read`, `files:write`, `im:history`, `reactions:write`, `users:read`
 - An AWS Bedrock Agent with an alias
 
 ## Configuration
@@ -28,6 +28,7 @@ All configuration is via environment variables:
 | `AWS_SESSION_TOKEN` | no | AWS session token (for temporary credentials) |
 | `AWS_REGION` | no | AWS region (default: `us-east-1`, or from profile config) |
 | `FIREHOSE_STREAM_NAME` | no | Kinesis Firehose delivery stream for analytics |
+| `SESSION_TTL_MINUTES` | no | Session staleness threshold in minutes (default: `55`, range: 1-60) |
 | `LOG_LEVEL` | no | Log level: `debug`, `info`, `warn`, `error` (default: `info`) |
 
 AWS credentials are resolved automatically: explicit keys > ECS task role > AWS CLI (SSO, assume-role, instance profile).

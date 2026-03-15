@@ -51,7 +51,7 @@ crystal run src/main.cr
 Before committing, run:
 
 ```sh
-make test          # 86 specs
+make test          # run specs
 make lint          # ameba linter
 make format-check  # crystal formatter
 ```
