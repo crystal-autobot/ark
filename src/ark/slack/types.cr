@@ -2,6 +2,7 @@ module Ark::Slack
   CHANNEL_TYPE_DM       = "im"
   REACTION_PROCESSING   = "eyes"
   ERROR_REPLY_TEXT      = "Sorry, I encountered an error processing your request."
+  BUSY_REPLY_TEXT       = "I'm currently handling too many requests. Please try again in a moment."
   MAX_INPUT_FILES       = 5
   MAX_INPUT_FILE_SIZE   = 10 * 1024 * 1024 # 10 MB
   MAX_OUTPUT_FILE_SIZE  = 50 * 1024 * 1024 # 50 MB

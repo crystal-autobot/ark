@@ -23,6 +23,7 @@ Go to **OAuth & Permissions** and add these **Bot Token Scopes**:
 |---|---|
 | `app_mentions:read` | Receive messages when the bot is mentioned in channels |
 | `chat:write` | Post responses back to Slack |
+| `channels:history` | Read thread replies in public channels (for context restoration) |
 | `im:history` | Read direct messages sent to the bot |
 | `reactions:write` | Add the "eyes" reaction when processing a message |
 | `files:read` | Download files attached to messages |

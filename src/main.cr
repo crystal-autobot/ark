@@ -40,6 +40,7 @@ module Ark
       agent: agent,
       publisher: publisher,
       bot_token: config.slack_bot_token,
+      session_ttl: config.session_ttl_minutes.minutes,
     )
 
     Log.info { "starting ark region=#{region} agent=#{config.bedrock_agent_id}" }

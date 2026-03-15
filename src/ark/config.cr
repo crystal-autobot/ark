@@ -1,8 +1,11 @@
 module Ark
   class Config
-    DEFAULT_AWS_REGION = "us-east-1"
-    DEFAULT_LOG_LEVEL  = "info"
-    ENV_FILE_PATH      = ".env"
+    DEFAULT_AWS_REGION          = "us-east-1"
+    DEFAULT_LOG_LEVEL           = "info"
+    DEFAULT_SESSION_TTL_MINUTES = 55
+    MIN_SESSION_TTL_MINUTES     =  1
+    MAX_SESSION_TTL_MINUTES     = 60
+    ENV_FILE_PATH               = ".env"
 
     getter slack_bot_token : String
     getter slack_app_token : String
@@ -15,6 +18,7 @@ module Ark
     getter aws_secret_access_key : String?
     getter aws_session_token : String?
     getter log_level : String
+    getter session_ttl_minutes : Int32
 
     def initialize(
       @slack_bot_token : String,
@@ -28,6 +32,7 @@ module Ark
       @aws_secret_access_key : String?,
       @aws_session_token : String?,
       @log_level : String,
+      @session_ttl_minutes : Int32 = DEFAULT_SESSION_TTL_MINUTES,
     )
     end
 
@@ -66,6 +71,8 @@ module Ark
         aws_secret_access_key: env("AWS_SECRET_ACCESS_KEY"),
         aws_session_token: env("AWS_SESSION_TOKEN"),
         log_level: env("LOG_LEVEL", DEFAULT_LOG_LEVEL).as(String),
+        session_ttl_minutes: env_int("SESSION_TTL_MINUTES", DEFAULT_SESSION_TTL_MINUTES)
+          .clamp(MIN_SESSION_TTL_MINUTES, MAX_SESSION_TTL_MINUTES),
       )
     end
 
@@ -95,6 +102,10 @@ module Ark
     private def self.env(key : String, default : String? = nil) : String?
       value = ENV[key]?
       value.nil? || value.empty? ? default : value
+    end
+
+    private def self.env_int(key : String, default : Int32) : Int32
+      env(key).try(&.to_i?) || default
     end
   end
 end

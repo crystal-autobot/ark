@@ -2,8 +2,10 @@ require "http/client"
 
 module Ark
   class Gateway
-    MAX_CONCURRENT_REQUESTS = 10
-    BUSY_REPLY_TEXT         = "I'm currently handling too many requests. Please try again in a moment."
+    MAX_CONCURRENT_REQUESTS   =  10
+    THREAD_REPLIES_LIMIT      = 200
+    DEFAULT_SESSION_TTL       = 55.minutes
+    SESSION_CLEANUP_THRESHOLD = 1000
 
     def initialize(
       @slack_api : Slack::SlackAPI,
@@ -11,9 +13,11 @@ module Ark
       @agent : Bedrock::AgentInvoker,
       @publisher : AWS::EventPublisher,
       @bot_token : String,
+      @session_ttl : Time::Span = DEFAULT_SESSION_TTL,
     )
       @bot_user_id = ""
       @users = {} of String => Hash(String, String)
+      @sessions = {} of String => Time
       @semaphore = Channel(Nil).new(MAX_CONCURRENT_REQUESTS)
       MAX_CONCURRENT_REQUESTS.times { @semaphore.send(nil) }
     end
@@ -111,7 +115,7 @@ module Ark
         end
       else
         Log.warn { "request dropped: concurrency limit reached user=#{user_id}" }
-        @slack_api.post_message(channel, BUSY_REPLY_TEXT, thread_ts)
+        @slack_api.post_message(channel, Slack::BUSY_REPLY_TEXT, thread_ts)
       end
     end
 
@@ -125,7 +129,9 @@ module Ark
     ) : Nil
       Log.info { "processing message user=#{user_id} channel=#{channel} thread=#{thread_ts} files=#{files.size}" }
 
-      result = @agent.invoke(text, session_id, user_attrs(user_id), files)
+      input_text = session_stale?(session_id) ? inject_thread_context(channel, thread_ts, text) : text
+      result = @agent.invoke(input_text, session_id, user_attrs(user_id), files)
+      touch_session(session_id)
 
       spawn { @publisher.publish(AWS::AnalyticsEvent.new(user_id, thread_ts, text, result.text)) }
 
@@ -163,6 +169,36 @@ module Ark
       attrs = info.to_attrs
       @users[user_id] = attrs
       attrs
+    end
+
+    private def session_stale?(session_id : String) : Bool
+      last_used = @sessions[session_id]?
+      return true unless last_used
+      Time.utc - last_used > @session_ttl
+    end
+
+    private def touch_session(session_id : String) : Nil
+      @sessions[session_id] = Time.utc
+      evict_stale_sessions if @sessions.size > SESSION_CLEANUP_THRESHOLD
+    end
+
+    private def evict_stale_sessions : Nil
+      cutoff = Time.utc - @session_ttl * 2
+      @sessions.reject! { |_, last_used| last_used < cutoff }
+    end
+
+    private def inject_thread_context(channel : String, thread_ts : String, text : String) : String
+      replies = @slack_api.get_thread_replies(channel, thread_ts, THREAD_REPLIES_LIMIT)
+      context = Slack::ThreadContext.format(replies, @bot_user_id)
+      if context
+        Log.info { "restoring thread context channel=#{channel} thread=#{thread_ts} replies=#{replies.size} context_size=#{context.size}" }
+        "#{context}\n\n#{text}"
+      else
+        text
+      end
+    rescue ex
+      Log.warn(exception: ex) { "failed to fetch thread context channel=#{channel} thread=#{thread_ts}" }
+      text
     end
 
     private def download_slack_files(slack_files : Array(JSON::Any)) : Array(Bedrock::InputFile)

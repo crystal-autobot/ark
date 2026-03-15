@@ -190,12 +190,54 @@ describe Ark::Config do
       ENV.delete("AWS_REGION")
       ENV.delete("LOG_LEVEL")
       ENV.delete("FIREHOSE_STREAM_NAME")
+      ENV.delete("SESSION_TTL_MINUTES")
       env_vars.each { |key, val| ENV[key] = val }
 
       begin
         config = Ark::Config.load
         config.aws_region.should eq("us-east-1")
         config.log_level.should eq("info")
+        config.session_ttl_minutes.should eq(55)
+      ensure
+        env_vars.each_key { |key| ENV.delete(key) }
+      end
+    end
+
+    it "clamps session_ttl_minutes to valid range" do
+      env_vars = {
+        "SLACK_BOT_TOKEN"        => "xoxb-test",
+        "SLACK_APP_TOKEN"        => "xapp-test",
+        "BEDROCK_AGENT_ID"       => "agent-123",
+        "BEDROCK_AGENT_ALIAS_ID" => "alias-456",
+        "AWS_ACCESS_KEY_ID"      => "AKTEST",
+        "AWS_SECRET_ACCESS_KEY"  => "secret",
+        "SESSION_TTL_MINUTES"    => "0",
+      }
+      env_vars.each { |key, val| ENV[key] = val }
+
+      begin
+        config = Ark::Config.load
+        config.session_ttl_minutes.should eq(1)
+      ensure
+        env_vars.each_key { |key| ENV.delete(key) }
+      end
+    end
+
+    it "clamps session_ttl_minutes above max to 60" do
+      env_vars = {
+        "SLACK_BOT_TOKEN"        => "xoxb-test",
+        "SLACK_APP_TOKEN"        => "xapp-test",
+        "BEDROCK_AGENT_ID"       => "agent-123",
+        "BEDROCK_AGENT_ALIAS_ID" => "alias-456",
+        "AWS_ACCESS_KEY_ID"      => "AKTEST",
+        "AWS_SECRET_ACCESS_KEY"  => "secret",
+        "SESSION_TTL_MINUTES"    => "120",
+      }
+      env_vars.each { |key, val| ENV[key] = val }
+
+      begin
+        config = Ark::Config.load
+        config.session_ttl_minutes.should eq(60)
       ensure
         env_vars.each_key { |key| ENV.delete(key) }
       end

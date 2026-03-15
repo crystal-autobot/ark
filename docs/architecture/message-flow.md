@@ -28,12 +28,16 @@ Download Slack files if attached (max 5, 10 MB each)
         │
         ▼
 Gateway.respond():
-  1. Look up user attributes (name, timezone, title) — cached
-  2. Call agent.invoke() with:
-     - Input text
+  1. Check if session is stale (unknown or idle > 55 min)
+  2. If stale: fetch thread replies from Slack, format as
+     context, and prepend to input text
+  3. Look up user attributes (name, timezone, title) — cached
+  4. Call agent.invoke() with:
+     - Input text (with context prefix if session was stale)
      - Session ID (thread_ts, dots replaced with dashes)
      - User attributes + current_datetime
      - Input files (sent as CODE_INTERPRETER use case)
+  5. Mark session as active (only on success)
         │
         ▼
 Bedrock::Agent builds signed POST request to:
@@ -80,6 +84,18 @@ Bedrock sessions are mapped to Slack threads:
 | Channel — thread reply | Thread timestamp |
 
 The dot in Slack timestamps (e.g., `1710412200.123456`) is replaced with a dash for Bedrock compatibility.
+
+### Thread context restoration
+
+Bedrock Agent sessions have a maximum idle TTL of 1 hour. When a user resumes a thread after the session expires, the agent loses all conversation memory. Ark detects this and automatically restores context:
+
+1. **Staleness check** — the gateway tracks the last successful invocation per session. If the session is unknown (e.g., after restart) or idle longer than the TTL (default 55 minutes), it is considered stale.
+2. **Thread fetch** — Slack's `conversations.replies` API retrieves up to 200 messages from the thread.
+3. **Formatting** — messages are formatted as `User (name): text` / `Assistant: text`, newest-first within a 12,000 character budget. Error replies and non-standard subtypes are filtered out. Long messages are truncated to 2,000 characters.
+4. **Injection** — the formatted context is prepended to `inputText` (not `promptSessionAttributes`), so it only costs tokens on the first message after expiry.
+5. **Graceful fallback** — if the thread fetch fails, the message proceeds without context.
+
+The TTL is configurable via `SESSION_TTL_MINUTES` (default: 55).
 
 ## User context
 

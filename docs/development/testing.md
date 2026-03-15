@@ -17,25 +17,7 @@ crystal spec spec/ark/slack/mrkdwn_spec.cr:10
 
 ## Test structure
 
-Tests mirror the source structure:
-
-```
-spec/
-├── spec_helper.cr              # Common setup, logging disabled
-└── ark/
-    ├── config_spec.cr          # Configuration loading
-    ├── gateway_spec.cr         # Event routing and response flow
-    ├── aws/
-    │   ├── credentials_spec.cr # Profile parsing, credential resolution
-    │   └── firehose_spec.cr    # Event serialization
-    ├── bedrock/
-    │   ├── event_stream_spec.cr # Binary protocol decoding
-    │   └── session_spec.cr     # Session ID sanitization
-    └── slack/
-        ├── block_kit_spec.cr   # Table parsing and Block Kit rendering
-        ├── mrkdwn_spec.cr      # Markdown to mrkdwn conversion
-        └── types_spec.cr       # MIME type resolution
-```
+Tests mirror the source layout under `spec/ark/`. Each module has a corresponding spec file, and `spec_helper.cr` provides common setup (logging disabled).
 
 ## Mock architecture
 
