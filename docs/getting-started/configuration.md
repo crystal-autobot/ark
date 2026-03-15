@@ -23,6 +23,7 @@ All configuration is via environment variables. Ark also reads a `.env` file fro
 | `AWS_SESSION_TOKEN` | — | AWS session token for temporary credentials |
 | `AWS_REGION` | `us-east-1` | AWS region (overridden by profile config if using `AWS_PROFILE`) |
 | `FIREHOSE_STREAM_NAME` | — | Kinesis Firehose stream for analytics (disabled if not set) |
+| `SESSION_TTL_MINUTES` | `55` | Minutes before a Bedrock session is considered stale (triggers thread context restoration) |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 
 AWS credentials are resolved automatically. See [credential resolution](#credential-resolution-order) below.
@@ -48,6 +49,7 @@ AWS_PROFILE=my-profile
 # Optional
 # AWS_REGION=us-east-1
 # FIREHOSE_STREAM_NAME=ark-analytics
+# SESSION_TTL_MINUTES=55
 LOG_LEVEL=info
 ```
 

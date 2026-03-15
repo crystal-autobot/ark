@@ -29,7 +29,10 @@ The central orchestrator. Receives events from Socket Mode, routes them to the a
 Manages the WebSocket lifecycle: calls `apps.connections.open` to get a WSS URL, connects, handles reconnection with backoff, and acknowledges envelopes.
 
 ### `Ark::Slack::Client`
-Wraps the Slack Web API: `auth.test`, `chat.postMessage`, `reactions.add`, `users.info`, and `files.uploadV2`.
+Wraps the Slack Web API: `auth.test`, `chat.postMessage`, `reactions.add`, `users.info`, `conversations.replies`, and `files.uploadV2`.
+
+### `Ark::Slack::ThreadContext`
+Formats Slack thread history into a character-budgeted context string for injection into Bedrock when a session has expired.
 
 ### `Ark::Slack::Mrkdwn`
 Converts markdown from Bedrock responses to Slack's mrkdwn format (bold, strikethrough, links, headings).

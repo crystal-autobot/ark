@@ -36,6 +36,14 @@ class MockSlackAPI < Ark::Slack::SlackAPI
   def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
     @uploaded_files << {channel, thread_ts, name, data}
   end
+
+  property thread_replies = [] of JSON::Any
+  property thread_replies_should_raise = false
+
+  def get_thread_replies(channel : String, ts : String, limit : Int32) : Array(JSON::Any)
+    raise "thread fetch error" if @thread_replies_should_raise
+    @thread_replies
+  end
 end
 
 class MockAgent < Ark::Bedrock::AgentInvoker
@@ -110,6 +118,13 @@ private def dm_event(user : String, text : String, ts : String = "1234.5678", th
   } of String => JSON::Any
   event["thread_ts"] = JSON::Any.new(thread_ts) if thread_ts
   JSON::Any.new({"event" => JSON::Any.new(event)})
+end
+
+private def thread_message(user : String, text : String) : JSON::Any
+  JSON::Any.new({
+    "user" => JSON::Any.new(user),
+    "text" => JSON::Any.new(text),
+  } of String => JSON::Any)
 end
 
 private def mention_event(user : String, text : String, ts : String = "1234.5678", channel : String = "C123") : JSON::Any
@@ -294,6 +309,117 @@ describe Ark::Gateway do
       2.times { Fiber.yield }
 
       slack_api.user_info_calls.size.should eq(1)
+    end
+  end
+
+  describe "thread context restoration" do
+    it "injects context on first message in thread (session unknown)" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.thread_replies = [
+        thread_message("U999", "earlier question"),
+        thread_message("UBOT", "earlier answer"),
+        thread_message("U999", "follow up"),
+      ]
+
+      socket_mode.simulate_event(dm_event("U999", "follow up", ts: "3.0", thread_ts: "1.0"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(1)
+      input = agent.invocations[0][0]
+      input.should contain("[Previous conversation context]")
+      input.should contain("User (U999): earlier question")
+      input.should contain("Assistant: earlier answer")
+      input.should contain("[End of previous context]")
+      input.should contain("follow up")
+    end
+
+    it "does not inject context on subsequent message (session warm)" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.thread_replies = [
+        thread_message("U999", "first"),
+        thread_message("UBOT", "response"),
+        thread_message("U999", "second"),
+      ]
+
+      socket_mode.simulate_event(dm_event("U999", "first", ts: "1.0", thread_ts: "1.0"))
+      2.times { Fiber.yield }
+
+      socket_mode.simulate_event(dm_event("U999", "second", ts: "2.0", thread_ts: "1.0"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(2)
+      agent.invocations[1][0].should eq("second")
+      agent.invocations[1][0].should_not contain("[Previous conversation context]")
+    end
+
+    it "does not inject context when thread has only current message" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.thread_replies = [
+        thread_message("U999", "hello"),
+      ]
+
+      socket_mode.simulate_event(dm_event("U999", "hello", ts: "1.0", thread_ts: "1.0"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(1)
+      agent.invocations[0][0].should eq("hello")
+    end
+
+    it "does not touch session on agent failure so next attempt re-injects" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.thread_replies = [
+        thread_message("U999", "context msg"),
+        thread_message("U999", "current"),
+      ]
+      agent.should_raise = true
+
+      socket_mode.simulate_event(dm_event("U999", "current", ts: "2.0", thread_ts: "1.0"))
+      2.times { Fiber.yield }
+
+      agent.should_raise = false
+      socket_mode.simulate_event(dm_event("U999", "retry", ts: "3.0", thread_ts: "1.0"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(2)
+      # Both attempts should have context injected since session was never touched
+      agent.invocations[0][0].should contain("[Previous conversation context]")
+      agent.invocations[1][0].should contain("[Previous conversation context]")
+    end
+
+    it "proceeds without context when thread fetch fails" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.thread_replies_should_raise = true
+
+      socket_mode.simulate_event(dm_event("U999", "hello", ts: "2.0", thread_ts: "1.0"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(1)
+      agent.invocations[0][0].should eq("hello")
+    end
+
+    it "injects context for app mentions in threads" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.thread_replies = [
+        thread_message("U999", "context"),
+        thread_message("UBOT", "prior reply"),
+        thread_message("U999", "mention"),
+      ]
+
+      event = {
+        "type"      => JSON::Any.new("app_mention"),
+        "user"      => JSON::Any.new("U999"),
+        "text"      => JSON::Any.new("<@UBOT> mention"),
+        "channel"   => JSON::Any.new("C123"),
+        "ts"        => JSON::Any.new("3.0"),
+        "thread_ts" => JSON::Any.new("1.0"),
+      } of String => JSON::Any
+      socket_mode.simulate_event(JSON::Any.new({"event" => JSON::Any.new(event)}))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(1)
+      input = agent.invocations[0][0]
+      input.should contain("[Previous conversation context]")
+      input.should contain("mention")
     end
   end
 end

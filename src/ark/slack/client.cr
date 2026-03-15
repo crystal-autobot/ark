@@ -26,6 +26,7 @@ module Ark::Slack
     abstract def post_blocks(channel : String, blocks : Array(JSON::Any), fallback_text : String, thread_ts : String? = nil) : Nil
     abstract def get_user_info(user_id : String) : UserInfo
     abstract def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
+    abstract def get_thread_replies(channel : String, ts : String, limit : Int32) : Array(JSON::Any)
   end
 
   class Client < SlackAPI
@@ -94,6 +95,16 @@ module Ark::Slack
     rescue ex
       Log.warn(exception: ex) { "failed to get user info: #{user_id}" }
       UserInfo.new
+    end
+
+    def get_thread_replies(channel : String, ts : String, limit : Int32) : Array(JSON::Any)
+      resp = api_get("conversations.replies", {
+        "channel" => channel,
+        "ts"      => ts,
+        "limit"   => limit.to_s,
+      })
+      json = parse_response(resp)
+      json["messages"].as_a
     end
 
     def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
