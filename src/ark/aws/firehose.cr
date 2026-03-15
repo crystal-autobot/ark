@@ -30,8 +30,8 @@ module Ark::AWS
     SERVICE         = "firehose"
     TARGET_PREFIX   = "Firehose_20150804"
 
-    def initialize(@stream_name : String, @region : String, @credentials : Credentials)
-      @signer = Signer.new(SERVICE, @region, @credentials)
+    def initialize(@stream_name : String, @region : String, @provider : CredentialProvider)
+      @signer = Signer.new(SERVICE, @region, @provider)
     end
 
     def publish(event : AnalyticsEvent) : Nil

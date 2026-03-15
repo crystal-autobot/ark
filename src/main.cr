@@ -9,7 +9,7 @@ module Ark
       log_config.bind("*", Config.parse_log_level(config.log_level), backend)
     end
 
-    credentials = AWS::Credentials.from_config(config)
+    provider = build_credential_provider(config)
 
     # Profile may override region if not explicitly set via AWS_REGION
     region = config.aws_region
@@ -21,14 +21,14 @@ module Ark
       agent_id: config.bedrock_agent_id,
       alias_id: config.bedrock_agent_alias_id,
       region: region,
-      credentials: credentials,
+      provider: provider,
     )
 
     slack_api = Slack::Client.new(config.slack_bot_token)
     socket_mode = Slack::SocketMode.new(config.slack_app_token)
 
     publisher : AWS::EventPublisher = if stream = config.firehose_stream_name
-      AWS::FirehosePublisher.new(stream, region, credentials)
+      AWS::FirehosePublisher.new(stream, region, provider)
     else
       Log.info { "firehose disabled (FIREHOSE_STREAM_NAME not set)" }
       AWS::NullPublisher.new
@@ -55,6 +55,16 @@ module Ark
     shutdown.receive
     gateway.stop
     Log.info { "shutdown complete" }
+  end
+
+  private def self.build_credential_provider(config : Config) : AWS::CredentialProvider
+    resolved = AWS::Credentials.resolve(config)
+
+    if resolved.expires_at
+      AWS::RefreshableCredentialProvider.new(resolved, -> { AWS::Credentials.resolve(config) })
+    else
+      AWS::StaticCredentialProvider.new(resolved.credentials)
+    end
   end
 end
 

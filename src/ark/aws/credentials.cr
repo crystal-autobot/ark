@@ -2,6 +2,8 @@ require "json"
 require "http/client"
 
 module Ark::AWS
+  record ResolvedCredentials, credentials : Credentials, expires_at : Time?
+
   struct Credentials
     getter access_key_id : String
     getter secret_access_key : String
@@ -10,29 +12,25 @@ module Ark::AWS
     def initialize(@access_key_id : String, @secret_access_key : String, @session_token : String? = nil)
     end
 
-    # Resolves credentials in order:
-    # 1. Explicit env vars (AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY)
-    # 2. ECS container credentials (task role via metadata endpoint)
-    # 3. AWS CLI export (SSO, assume-role, credential_process, instance profile)
-    def self.from_config(config : Config) : Credentials
+    # Resolves credentials with optional expiry information.
+    def self.resolve(config : Config) : ResolvedCredentials
       if (key_id = config.aws_access_key_id) && (secret = config.aws_secret_access_key)
         Log.info { "using explicit AWS credentials" }
-        return new(access_key_id: key_id, secret_access_key: secret, session_token: config.aws_session_token)
+        creds = new(access_key_id: key_id, secret_access_key: secret, session_token: config.aws_session_token)
+        return ResolvedCredentials.new(credentials: creds, expires_at: nil)
       end
 
       if ENV["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"]?
         Log.info { "using ECS container credentials" }
-        return from_ecs_metadata
+        return resolve_ecs_metadata
       end
 
       label = config.aws_profile.try { |profile| " (profile: #{profile})" }
       Log.info { "using AWS CLI credentials#{label}" }
-      from_cli(config.aws_profile)
+      resolve_cli(config.aws_profile)
     end
 
-    # Reads credentials from the ECS container metadata endpoint.
-    # ECS sets AWS_CONTAINER_CREDENTIALS_RELATIVE_URI automatically for task roles.
-    def self.from_ecs_metadata : Credentials
+    def self.resolve_ecs_metadata : ResolvedCredentials
       relative_uri = ENV["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"]
       resp = HTTP::Client.get("http://169.254.170.2#{relative_uri}")
 
@@ -40,12 +38,10 @@ module Ark::AWS
         raise "ECS metadata endpoint returned #{resp.status_code}"
       end
 
-      parse_credential_json(resp.body, "ECS metadata")
+      parse_resolved_json(resp.body, "ECS metadata")
     end
 
-    # Uses the AWS CLI to export credentials.
-    # Supports SSO, assume-role, credential_process, instance profiles, etc.
-    def self.from_cli(profile : String? = nil) : Credentials
+    def self.resolve_cli(profile : String? = nil) : ResolvedCredentials
       args = ["configure", "export-credentials"]
       args += ["--profile", profile] if profile
 
@@ -63,7 +59,7 @@ module Ark::AWS
         raise "failed to export AWS credentials (#{label}): #{error.to_s.strip}"
       end
 
-      parse_credential_json(output.to_s, "AWS CLI")
+      parse_resolved_json(output.to_s, "AWS CLI")
     end
 
     # Reads region from ~/.aws/config for the given profile.
@@ -76,7 +72,7 @@ module Ark::AWS
       section["region"]?
     end
 
-    private def self.parse_credential_json(body : String, source : String) : Credentials
+    private def self.parse_resolved_json(body : String, source : String) : ResolvedCredentials
       json = JSON.parse(body)
       access_key = json["AccessKeyId"]?.try(&.as_s?)
       secret_key = json["SecretAccessKey"]?.try(&.as_s?)
@@ -85,11 +81,20 @@ module Ark::AWS
         raise "#{source} returned incomplete credentials"
       end
 
-      new(
+      creds = new(
         access_key_id: access_key,
         secret_access_key: secret_key,
         session_token: json["SessionToken"]?.try(&.as_s?) || json["Token"]?.try(&.as_s?),
       )
+
+      expires_at = json["Expiration"]?.try(&.as_s?).try do |value|
+        Time.parse_rfc3339(value)
+      rescue ex
+        Log.warn(exception: ex) { "failed to parse credential expiration: #{value}" }
+        nil
+      end
+
+      ResolvedCredentials.new(credentials: creds, expires_at: expires_at)
     end
 
     private def self.aws_config_dir : String
