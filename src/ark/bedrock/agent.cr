@@ -24,9 +24,9 @@ module Ark::Bedrock
       @agent_id : String,
       @alias_id : String,
       @region : String,
-      @credentials : AWS::Credentials,
+      @provider : AWS::CredentialProvider,
     )
-      @signer = AWS::Signer.new(SIGNING_SERVICE, @region, @credentials)
+      @signer = AWS::Signer.new(SIGNING_SERVICE, @region, @provider)
     end
 
     def invoke(

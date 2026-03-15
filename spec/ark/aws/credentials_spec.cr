@@ -1,11 +1,30 @@
 require "../../spec_helper"
 require "file_utils"
 
+private def resolve_with_env(**extra) : Ark::AWS::ResolvedCredentials
+  env_vars = {
+    "SLACK_BOT_TOKEN"        => "xoxb-test",
+    "SLACK_APP_TOKEN"        => "xapp-test",
+    "BEDROCK_AGENT_ID"       => "agent-123",
+    "BEDROCK_AGENT_ALIAS_ID" => "alias-456",
+  }
+  env_vars.each { |key, val| ENV[key] = val }
+  extra.each { |key, val| ENV[key.to_s] = val }
+
+  begin
+    config = Ark::Config.load
+    Ark::AWS::Credentials.resolve(config)
+  ensure
+    env_vars.each_key { |key| ENV.delete(key) }
+    extra.each { |key, _| ENV.delete(key.to_s) }
+  end
+end
+
 describe Ark::AWS::Credentials do
-  describe ".from_cli" do
+  describe ".resolve_cli" do
     it "raises when aws CLI is not available or profile fails" do
       expect_raises(Exception, /AWS/) do
-        Ark::AWS::Credentials.from_cli("nonexistent-profile-#{Random.new.hex(8)}")
+        Ark::AWS::Credentials.resolve_cli("nonexistent-profile-#{Random.new.hex(8)}")
       end
     end
   end
@@ -45,26 +64,23 @@ describe Ark::AWS::Credentials do
     end
   end
 
-  describe ".from_config" do
+  describe ".resolve" do
     it "prefers explicit keys over profile" do
-      env_vars = {
-        "SLACK_BOT_TOKEN"        => "xoxb-test",
-        "SLACK_APP_TOKEN"        => "xapp-test",
-        "BEDROCK_AGENT_ID"       => "agent-123",
-        "BEDROCK_AGENT_ALIAS_ID" => "alias-456",
-        "AWS_ACCESS_KEY_ID"      => "AKEXPLICIT",
-        "AWS_SECRET_ACCESS_KEY"  => "secretexplicit",
-        "AWS_PROFILE"            => "should-be-ignored",
-      }
-      env_vars.each { |key, val| ENV[key] = val }
+      resolved = resolve_with_env(
+        AWS_ACCESS_KEY_ID: "AKEXPLICIT",
+        AWS_SECRET_ACCESS_KEY: "secretexplicit",
+        AWS_PROFILE: "should-be-ignored",
+      )
+      resolved.credentials.access_key_id.should eq("AKEXPLICIT")
+    end
 
-      begin
-        config = Ark::Config.load
-        creds = Ark::AWS::Credentials.from_config(config)
-        creds.access_key_id.should eq("AKEXPLICIT")
-      ensure
-        env_vars.each_key { |key| ENV.delete(key) }
-      end
+    it "returns nil expiry for explicit credentials" do
+      resolved = resolve_with_env(
+        AWS_ACCESS_KEY_ID: "AKRESOLVE",
+        AWS_SECRET_ACCESS_KEY: "secretresolve",
+      )
+      resolved.credentials.access_key_id.should eq("AKRESOLVE")
+      resolved.expires_at.should be_nil
     end
   end
 end

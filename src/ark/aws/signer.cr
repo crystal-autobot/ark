@@ -2,18 +2,19 @@ require "awscr-signer"
 
 module Ark::AWS
   class Signer
-    def initialize(service : String, region : String, credentials : Credentials)
-      @signer = Awscr::Signer::Signers::V4.new(
-        service,
-        region,
-        credentials.access_key_id,
-        credentials.secret_access_key,
-        credentials.session_token,
-      )
+    def initialize(@service : String, @region : String, @provider : CredentialProvider)
     end
 
     def sign(request : HTTP::Request) : Nil
-      @signer.sign(request)
+      creds = @provider.credentials
+      signer = Awscr::Signer::Signers::V4.new(
+        @service,
+        @region,
+        creds.access_key_id,
+        creds.secret_access_key,
+        creds.session_token,
+      )
+      signer.sign(request)
     end
   end
 end
