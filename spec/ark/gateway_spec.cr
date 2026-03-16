@@ -324,6 +324,17 @@ describe Ark::Gateway do
   end
 
   describe "response formatting" do
+    it "skips posting when response text is empty" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(text: "")
+
+      socket_mode.simulate_event(dm_event("U999", "hello"))
+      2.times { Fiber.yield }
+
+      slack_api.messages.should be_empty
+      slack_api.block_messages.should be_empty
+    end
+
     it "posts blocks when response contains tables" do
       _, slack_api, socket_mode, agent, _ = build_gateway
       agent.result = Ark::Bedrock::AgentResponse.new(

@@ -146,6 +146,8 @@ module Ark
     end
 
     private def post_response(channel : String, thread_ts : String, result : Bedrock::AgentResponse) : Nil
+      return if result.text.strip.empty?
+
       segments, has_table = Slack::BlockKit.parse_segments(result.text)
 
       if has_table
