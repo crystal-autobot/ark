@@ -2,6 +2,8 @@ module Ark::Slack::Mrkdwn
   MENTION_RE     = /<@\w+>\s*/
   BOLD_RE        = /\*\*(.+?)\*\*/
   STRIKE_RE      = /~~(.+?)~~/
+  BACKTICK_RE    = /`([^`]+)`/
+  ITALIC_RE      = /(?<!\*)\*([^*]+)\*(?!\*)/
   LINK_RE        = /\[([^\]]+)\]\(([^)]+)\)/
   HEADING_RE     = Regex.new(%q(^\#{1,6}\s+([^\n]+)$), Regex::Options::MULTILINE)
   BLANK_LINES_RE = /\n{3,}/
@@ -34,6 +36,13 @@ module Ark::Slack::Mrkdwn
       sources.each do |source|
         buf << "\n• " << source
       end
+    end
+  end
+
+  # Strips markdown formatting, returning plain text.
+  def self.strip_markdown(text : String) : String
+    [BACKTICK_RE, BOLD_RE, ITALIC_RE, STRIKE_RE].reduce(text) do |str, pattern|
+      str.gsub(pattern, "\\1")
     end
   end
 

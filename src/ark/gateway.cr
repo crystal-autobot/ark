@@ -151,13 +151,22 @@ module Ark
       segments, has_table = Slack::BlockKit.parse_segments(result.text)
 
       if has_table
-        blocks = Slack::BlockKit.build_response_blocks(segments, result.sources)
-        @slack_api.post_blocks(channel, blocks, result.text, thread_ts)
+        begin
+          blocks = Slack::BlockKit.build_response_blocks(segments, result.sources)
+          @slack_api.post_blocks(channel, blocks, result.text, thread_ts)
+        rescue ex
+          Log.warn(exception: ex) { "block post failed, falling back to plain text" }
+          post_plain_response(channel, thread_ts, result)
+        end
       else
-        response = Slack::Mrkdwn.convert(result.text)
-        response += Slack::Mrkdwn.format_sources(result.sources) unless result.sources.empty?
-        @slack_api.post_message(channel, response, thread_ts)
+        post_plain_response(channel, thread_ts, result)
       end
+    end
+
+    private def post_plain_response(channel : String, thread_ts : String, result : Bedrock::AgentResponse) : Nil
+      response = Slack::Mrkdwn.convert(result.text)
+      response += Slack::Mrkdwn.format_sources(result.sources) unless result.sources.empty?
+      @slack_api.post_message(channel, response, thread_ts)
     end
 
     private def thread_timestamp(thread_ts : String?, message_ts : String) : String

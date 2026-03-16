@@ -347,6 +347,23 @@ describe Ark::Gateway do
       slack_api.block_messages.size.should eq(1)
     end
 
+    it "strips markdown from table cells before posting blocks" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "intro\n| Name | Info |\n|---|---|\n| `alpha` | **bravo** value |\noutro",
+      )
+
+      socket_mode.simulate_event(dm_event("U999", "hello"))
+      2.times { Fiber.yield }
+
+      slack_api.block_messages.size.should eq(1)
+      blocks = slack_api.block_messages[0][1]
+      table_block = blocks.find { |b| b["type"].as_s == "table" }.not_nil!
+      data_row = table_block["rows"].as_a[1].as_a
+      data_row[0]["text"].as_s.should eq("alpha")
+      data_row[1]["text"].as_s.should eq("bravo value")
+    end
+
     it "appends sources to plain text response" do
       _, slack_api, socket_mode, agent, _ = build_gateway
       agent.result = Ark::Bedrock::AgentResponse.new(
