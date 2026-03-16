@@ -270,7 +270,71 @@ describe Ark::Gateway do
     end
   end
 
+  describe "file uploads" do
+    it "uploads agent output files" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "here is your chart",
+        files: [
+          Ark::Bedrock::AgentFile.new(name: "chart.png", media_type: "image/png", data: "PNG".to_slice),
+        ],
+      )
+
+      socket_mode.simulate_event(dm_event("U999", "generate a chart"))
+      2.times { Fiber.yield }
+
+      slack_api.uploaded_files.size.should eq(1)
+      slack_api.uploaded_files[0][2].should eq("chart.png")
+    end
+
+    it "deduplicates files with the same name" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "here is your chart",
+        files: [
+          Ark::Bedrock::AgentFile.new(name: "chart.png", media_type: "image/png", data: "PNG1".to_slice),
+          Ark::Bedrock::AgentFile.new(name: "chart.png", media_type: "image/png", data: "PNG2".to_slice),
+        ],
+      )
+
+      socket_mode.simulate_event(dm_event("U999", "generate a chart"))
+      2.times { Fiber.yield }
+
+      slack_api.uploaded_files.size.should eq(1)
+      slack_api.uploaded_files[0][2].should eq("chart.png")
+    end
+
+    it "uploads multiple distinct files" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "here are your files",
+        files: [
+          Ark::Bedrock::AgentFile.new(name: "chart.png", media_type: "image/png", data: "PNG".to_slice),
+          Ark::Bedrock::AgentFile.new(name: "data.csv", media_type: "text/csv", data: "a,b".to_slice),
+        ],
+      )
+
+      socket_mode.simulate_event(dm_event("U999", "generate files"))
+      2.times { Fiber.yield }
+
+      slack_api.uploaded_files.size.should eq(2)
+      slack_api.uploaded_files[0][2].should eq("chart.png")
+      slack_api.uploaded_files[1][2].should eq("data.csv")
+    end
+  end
+
   describe "response formatting" do
+    it "skips posting when response text is empty" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(text: "")
+
+      socket_mode.simulate_event(dm_event("U999", "hello"))
+      2.times { Fiber.yield }
+
+      slack_api.messages.should be_empty
+      slack_api.block_messages.should be_empty
+    end
+
     it "posts blocks when response contains tables" do
       _, slack_api, socket_mode, agent, _ = build_gateway
       agent.result = Ark::Bedrock::AgentResponse.new(

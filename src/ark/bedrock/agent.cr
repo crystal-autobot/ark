@@ -120,7 +120,7 @@ module Ark::Bedrock
         end
       end
 
-      Log.debug { "bedrock response: length=#{text.bytesize} sources=#{sources.size} files=#{output_files.size}" }
+      Log.info { "bedrock response: length=#{text.bytesize} sources=#{sources.size} output_files=#{output_files.size}" }
       AgentResponse.new(text: text.to_s, sources: sources, files: output_files)
     end
 
