@@ -82,6 +82,17 @@ describe Ark::Slack::BlockKit do
       blocks[0]["rows"].as_a.size.should eq(2)
     end
 
+    it "strips markdown formatting from table cell text" do
+      table = "| Name | Info |\n|---|---|\n| `alpha` | **bravo** value |"
+      segments = [Ark::Slack::BlockKit::TextSegment.new(table, true)]
+      blocks = Ark::Slack::BlockKit.build_response_blocks(segments, [] of String)
+
+      rows = blocks[0]["rows"].as_a
+      data_row = rows[1].as_a
+      data_row[0]["text"].as_s.should eq("alpha")
+      data_row[1]["text"].as_s.should eq("bravo value")
+    end
+
     it "appends sources block" do
       segments = [Ark::Slack::BlockKit::TextSegment.new("text", false)]
       blocks = Ark::Slack::BlockKit.build_response_blocks(segments, ["doc.pdf"])
