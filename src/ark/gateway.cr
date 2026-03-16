@@ -127,7 +127,7 @@ module Ark
       session_id : String,
       files : Array(Bedrock::InputFile),
     ) : Nil
-      Log.info { "processing message user=#{user_id} channel=#{channel} thread=#{thread_ts} files=#{files.size}" }
+      Log.info { "processing message user=#{user_id} channel=#{channel} thread=#{thread_ts} input_files=#{files.size}" }
 
       input_text = session_stale?(session_id) ? inject_thread_context(channel, thread_ts, text) : text
       result = @agent.invoke(input_text, session_id, user_attrs(user_id), files)
@@ -137,7 +137,7 @@ module Ark
 
       post_response(channel, thread_ts, result)
 
-      result.files.each do |file|
+      result.files.uniq(&.name).each do |file|
         @slack_api.upload_file(channel, thread_ts, file.name, file.data)
       end
     rescue ex
