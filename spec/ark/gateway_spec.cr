@@ -11,6 +11,7 @@ class MockSlackAPI < Ark::Slack::SlackAPI
 
   property bot_user_id = "UBOT"
   property user_info_result = Ark::Slack::UserInfo.new
+  property block_post_should_raise = false
 
   def auth_test : String
     @bot_user_id
@@ -25,6 +26,7 @@ class MockSlackAPI < Ark::Slack::SlackAPI
   end
 
   def post_blocks(channel : String, blocks : Array(JSON::Any), fallback_text : String, thread_ts : String? = nil) : Nil
+    raise "block post error" if @block_post_should_raise
     @block_messages << {channel, blocks, fallback_text, thread_ts}
   end
 
@@ -362,6 +364,41 @@ describe Ark::Gateway do
       data_row = table_block["rows"].as_a[1].as_a
       data_row[0]["text"].as_s.should eq("alpha")
       data_row[1]["text"].as_s.should eq("bravo value")
+    end
+
+    it "falls back to code block tables when block post fails" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "intro\n| A | B |\n| 1 | 2 |\noutro"
+      )
+
+      # Make post_blocks raise to trigger fallback
+      slack_api.block_post_should_raise = true
+
+      socket_mode.simulate_event(dm_event("U999", "hello"))
+      2.times { Fiber.yield }
+
+      slack_api.block_messages.should be_empty
+      slack_api.messages.size.should eq(1)
+      slack_api.messages[0][1].should contain("```\n")
+      slack_api.messages[0][1].should contain("intro")
+      slack_api.messages[0][1].should contain("outro")
+    end
+
+    it "appends sources in code block fallback" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "intro\n| A | B |\n| 1 | 2 |\noutro",
+        sources: ["policy.pdf"],
+      )
+      slack_api.block_post_should_raise = true
+
+      socket_mode.simulate_event(dm_event("U999", "hello"))
+      2.times { Fiber.yield }
+
+      slack_api.messages.size.should eq(1)
+      slack_api.messages[0][1].should contain("Sources")
+      slack_api.messages[0][1].should contain("policy.pdf")
     end
 
     it "appends sources to plain text response" do

@@ -155,12 +155,23 @@ module Ark
           blocks = Slack::BlockKit.build_response_blocks(segments, result.sources)
           @slack_api.post_blocks(channel, blocks, result.text, thread_ts)
         rescue ex
-          Log.warn(exception: ex) { "block post failed, falling back to plain text" }
-          post_plain_response(channel, thread_ts, result)
+          Log.warn(exception: ex) { "block post failed, falling back to code block tables" }
+          post_code_block_response(channel, thread_ts, segments, result.sources)
         end
       else
         post_plain_response(channel, thread_ts, result)
       end
+    end
+
+    private def post_code_block_response(
+      channel : String,
+      thread_ts : String,
+      segments : Array(Slack::BlockKit::TextSegment),
+      sources : Array(String),
+    ) : Nil
+      response = Slack::BlockKit.render_with_code_block_tables(segments)
+      response += Slack::Mrkdwn.format_sources(sources) unless sources.empty?
+      @slack_api.post_message(channel, response, thread_ts)
     end
 
     private def post_plain_response(channel : String, thread_ts : String, result : Bedrock::AgentResponse) : Nil

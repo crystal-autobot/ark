@@ -100,6 +100,37 @@ module Ark::Slack::BlockKit
     blocks
   end
 
+  # Renders segments with tables as preformatted code blocks (fallback for Block Kit).
+  def self.render_with_code_block_tables(segments : Array(TextSegment)) : String
+    String.build do |buf|
+      segments.each_with_index do |seg, i|
+        buf << "\n" if i > 0
+        if seg.table?
+          buf << render_as_code_block(seg.content)
+        else
+          buf << Mrkdwn.convert(seg.content)
+        end
+      end
+    end.strip
+  end
+
+  # Renders a markdown table as a preformatted, column-aligned code block.
+  def self.render_as_code_block(text : String) : String
+    rows = parse_markdown_table(text)
+    return text if rows.empty?
+
+    rows = rows.map { |row| row.map { |cell| Mrkdwn.strip_markdown(cell) } }
+
+    col_count = rows.max_of(&.size)
+    widths = (0...col_count).map { |i| rows.max_of { |row| (row[i]? || "").size } }
+
+    lines = rows.map do |row|
+      (0...col_count).map { |i| (row[i]? || "").ljust(widths[i]) }.join("  ")
+    end
+
+    "```\n#{lines.join("\n")}\n```"
+  end
+
   private def self.section_block(text : String) : JSON::Any
     JSON::Any.new({
       "type" => JSON::Any.new("section"),

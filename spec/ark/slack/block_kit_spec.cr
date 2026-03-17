@@ -100,4 +100,65 @@ describe Ark::Slack::BlockKit do
       blocks[1]["text"]["text"].as_s.should contain("Sources")
     end
   end
+
+  describe ".render_as_code_block" do
+    it "renders table as aligned preformatted block" do
+      text = "| Name | Age |\n| --- | --- |\n| Alice | 30 |"
+      result = Ark::Slack::BlockKit.render_as_code_block(text)
+      result.should start_with("```\n")
+      result.should end_with("\n```")
+      result.should contain("Name")
+      result.should contain("Alice")
+    end
+
+    it "strips markdown from cells" do
+      text = "| Field | Value |\n|---|---|\n| `ID` | **gm3** |"
+      result = Ark::Slack::BlockKit.render_as_code_block(text)
+      # Extract lines between code fences
+      inner = result.strip("` \n")
+      inner.should contain("ID")
+      inner.should contain("gm3")
+      inner.should_not contain("`")
+      inner.should_not contain("**")
+    end
+
+    it "aligns columns with padding" do
+      text = "| A | BB |\n|---|---|\n| CCC | D |"
+      result = Ark::Slack::BlockKit.render_as_code_block(text)
+      lines = result.strip("```\n").split("\n")
+      lines.each do |line|
+        next if line == "```"
+        # All lines should have same alignment
+        parts = line.split(/  +/)
+        parts.size.should eq(2)
+      end
+    end
+
+    it "returns original text for non-table input" do
+      Ark::Slack::BlockKit.render_as_code_block("").should eq("")
+    end
+  end
+
+  describe ".render_with_code_block_tables" do
+    it "renders tables as code blocks and prose as mrkdwn" do
+      segments = [
+        Ark::Slack::BlockKit::TextSegment.new("intro text", false),
+        Ark::Slack::BlockKit::TextSegment.new("| A | B |\n| 1 | 2 |", true),
+        Ark::Slack::BlockKit::TextSegment.new("outro text", false),
+      ]
+      result = Ark::Slack::BlockKit.render_with_code_block_tables(segments)
+      result.should contain("intro text")
+      result.should contain("```\n")
+      result.should contain("outro text")
+    end
+
+    it "converts prose markdown to mrkdwn" do
+      segments = [
+        Ark::Slack::BlockKit::TextSegment.new("**bold** text", false),
+        Ark::Slack::BlockKit::TextSegment.new("| A | B |\n| 1 | 2 |", true),
+      ]
+      result = Ark::Slack::BlockKit.render_with_code_block_tables(segments)
+      result.should contain("*bold* text")
+    end
+  end
 end
