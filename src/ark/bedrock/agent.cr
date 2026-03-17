@@ -10,6 +10,18 @@ module Ark::Bedrock
       user_attrs : Hash(String, String),
       files : Array(InputFile),
     ) : AgentResponse
+
+    def invoke_streaming(
+      input_text : String,
+      session_id : String,
+      user_attrs : Hash(String, String),
+      files : Array(InputFile),
+      & : String ->
+    ) : AgentResponse
+      result = invoke(input_text, session_id, user_attrs, files)
+      yield result.text unless result.text.empty?
+      result
+    end
   end
 
   class Agent < AgentInvoker
@@ -35,6 +47,16 @@ module Ark::Bedrock
       user_attrs : Hash(String, String),
       files : Array(InputFile),
     ) : AgentResponse
+      invoke_streaming(input_text, session_id, user_attrs, files) { |_| }
+    end
+
+    def invoke_streaming(
+      input_text : String,
+      session_id : String,
+      user_attrs : Hash(String, String),
+      files : Array(InputFile),
+      & : String ->
+    ) : AgentResponse
       session_id = Session.sanitize_id(session_id)
       attrs = Session.prompt_attributes.merge(user_attrs)
 
@@ -50,13 +72,15 @@ module Ark::Bedrock
       client.connect_timeout = CONNECT_TIMEOUT
       client.read_timeout = READ_TIMEOUT
 
-      response = client.exec(request)
-      unless response.success?
-        Log.error { "bedrock invoke failed: status=#{response.status_code}" }
-        raise "bedrock agent invocation failed (#{response.status_code})"
+      result = uninitialized AgentResponse
+      client.exec(request) do |response|
+        unless response.success?
+          Log.error { "bedrock invoke failed: status=#{response.status_code}" }
+          raise "bedrock agent invocation failed (#{response.status_code})"
+        end
+        result = parse_response_streaming(response.body_io) { |chunk| yield chunk }
       end
-
-      parse_response(response)
+      result
     end
 
     private def endpoint_uri(session_id : String) : URI
@@ -102,8 +126,7 @@ module Ark::Bedrock
       })
     end
 
-    private def parse_response(response : HTTP::Client::Response) : AgentResponse
-      io = IO::Memory.new(response.body)
+    private def parse_response_streaming(io : IO, & : String ->) : AgentResponse
       text = String::Builder.new
       sources = [] of String
       seen = Set(String).new
@@ -114,7 +137,12 @@ module Ark::Bedrock
 
         case msg.event_type
         when "chunk"
-          parse_chunk(msg.payload, text, sources, seen)
+          chunk_text = decode_chunk_text(msg.payload)
+          if chunk_text
+            text << chunk_text
+            yield chunk_text
+          end
+          collect_citations(msg.payload, sources, seen)
         when "files"
           parse_files(msg.payload, output_files)
         end
@@ -124,18 +152,19 @@ module Ark::Bedrock
       AgentResponse.new(text: text.to_s, sources: sources, files: output_files)
     end
 
-    private def parse_chunk(
+    private def decode_chunk_text(payload : Bytes) : String?
+      json = JSON.parse(String.new(payload))
+      if bytes_b64 = json["bytes"]?.try(&.as_s?)
+        String.new(Base64.decode(bytes_b64))
+      end
+    end
+
+    private def collect_citations(
       payload : Bytes,
-      text : String::Builder,
       sources : Array(String),
       seen : Set(String),
     ) : Nil
       json = JSON.parse(String.new(payload))
-
-      if bytes_b64 = json["bytes"]?.try(&.as_s?)
-        text << String.new(Base64.decode(bytes_b64))
-      end
-
       json["attribution"]?.try(&.["citations"]?).try(&.as_a).try &.each do |citation|
         citation["retrievedReferences"]?.try(&.as_a).try &.each do |ref|
           name = extract_source_name(ref)

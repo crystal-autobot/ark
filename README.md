@@ -28,6 +28,7 @@ All configuration is via environment variables:
 | `AWS_SESSION_TOKEN` | no | AWS session token (for temporary credentials) |
 | `AWS_REGION` | no | AWS region (default: `us-east-1`, or from profile config) |
 | `FIREHOSE_STREAM_NAME` | no | Kinesis Firehose delivery stream for analytics |
+| `STREAMING_ENABLED` | no | Enable streaming responses (default: `true`, set to `false` to disable) |
 | `SESSION_TTL_MINUTES` | no | Session staleness threshold in minutes (default: `55`, range: 1-60) |
 | `LOG_LEVEL` | no | Log level: `debug`, `info`, `warn`, `error` (default: `info`) |
 

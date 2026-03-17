@@ -19,6 +19,7 @@ module Ark
     getter aws_session_token : String?
     getter log_level : String
     getter session_ttl_minutes : Int32
+    getter? streaming_enabled : Bool
 
     def initialize(
       @slack_bot_token : String,
@@ -33,6 +34,7 @@ module Ark
       @aws_session_token : String?,
       @log_level : String,
       @session_ttl_minutes : Int32 = DEFAULT_SESSION_TTL_MINUTES,
+      @streaming_enabled : Bool = true,
     )
     end
 
@@ -73,6 +75,7 @@ module Ark
         log_level: env("LOG_LEVEL", DEFAULT_LOG_LEVEL).as(String),
         session_ttl_minutes: env_int("SESSION_TTL_MINUTES", DEFAULT_SESSION_TTL_MINUTES)
           .clamp(MIN_SESSION_TTL_MINUTES, MAX_SESSION_TTL_MINUTES),
+        streaming_enabled: env_bool("STREAMING_ENABLED", true),
       )
     end
 
@@ -106,6 +109,12 @@ module Ark
 
     private def self.env_int(key : String, default : Int32) : Int32
       env(key).try(&.to_i?) || default
+    end
+
+    private def self.env_bool(key : String, default : Bool) : Bool
+      value = env(key)
+      return default unless value
+      value.downcase == "true" || value == "1"
     end
   end
 end

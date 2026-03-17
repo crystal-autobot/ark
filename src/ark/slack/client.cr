@@ -23,6 +23,9 @@ module Ark::Slack
     abstract def auth_test : String
     abstract def add_reaction(channel : String, timestamp : String, emoji : String) : Nil
     abstract def post_message(channel : String, text : String, thread_ts : String? = nil) : Nil
+    abstract def post_message_with_ts(channel : String, text : String, thread_ts : String? = nil) : String
+    abstract def update_message(channel : String, ts : String, text : String) : Nil
+    abstract def delete_message(channel : String, ts : String) : Nil
     abstract def post_blocks(channel : String, blocks : Array(JSON::Any), fallback_text : String, thread_ts : String? = nil) : Nil
     abstract def get_user_info(user_id : String) : UserInfo
     abstract def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
@@ -63,6 +66,26 @@ module Ark::Slack
         resp = api_post("chat.postMessage", body)
         check_response(resp, "chat.postMessage")
       end
+    end
+
+    def post_message_with_ts(channel : String, text : String, thread_ts : String? = nil) : String
+      body = {"channel" => channel, "text" => text} of String => String
+      body["thread_ts"] = thread_ts if thread_ts
+      resp = api_post("chat.postMessage", body)
+      json = parse_response(resp)
+      json["ts"].as_s
+    end
+
+    def update_message(channel : String, ts : String, text : String) : Nil
+      body = {"channel" => channel, "ts" => ts, "text" => text} of String => String
+      resp = api_post("chat.update", body)
+      check_response(resp, "chat.update")
+    end
+
+    def delete_message(channel : String, ts : String) : Nil
+      body = {"channel" => channel, "ts" => ts} of String => String
+      resp = api_post("chat.delete", body)
+      check_response(resp, "chat.delete")
     end
 
     def post_blocks(

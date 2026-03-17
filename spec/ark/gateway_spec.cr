@@ -5,6 +5,9 @@ require "../spec_helper"
 class MockSlackAPI < Ark::Slack::SlackAPI
   getter reactions = [] of {String, String, String}
   getter messages = [] of {String, String, String?}
+  getter messages_with_ts = [] of {String, String, String?}
+  getter updates = [] of {String, String, String}
+  getter deletions = [] of {String, String}
   getter block_messages = [] of {String, Array(JSON::Any), String, String?}
   getter uploaded_files = [] of {String, String, String, Bytes}
   getter user_info_calls = [] of String
@@ -12,6 +15,7 @@ class MockSlackAPI < Ark::Slack::SlackAPI
   property bot_user_id = "UBOT"
   property user_info_result = Ark::Slack::UserInfo.new
   property block_post_should_raise = false
+  property next_message_ts = "msg.ts"
 
   def auth_test : String
     @bot_user_id
@@ -23,6 +27,19 @@ class MockSlackAPI < Ark::Slack::SlackAPI
 
   def post_message(channel : String, text : String, thread_ts : String? = nil) : Nil
     @messages << {channel, text, thread_ts}
+  end
+
+  def post_message_with_ts(channel : String, text : String, thread_ts : String? = nil) : String
+    @messages_with_ts << {channel, text, thread_ts}
+    @next_message_ts
+  end
+
+  def update_message(channel : String, ts : String, text : String) : Nil
+    @updates << {channel, ts, text}
+  end
+
+  def delete_message(channel : String, ts : String) : Nil
+    @deletions << {channel, ts}
   end
 
   def post_blocks(channel : String, blocks : Array(JSON::Any), fallback_text : String, thread_ts : String? = nil) : Nil
@@ -52,6 +69,7 @@ class MockAgent < Ark::Bedrock::AgentInvoker
   getter invocations = [] of {String, String, Hash(String, String), Array(Ark::Bedrock::InputFile)}
   property result = Ark::Bedrock::AgentResponse.new(text: "ok")
   property should_raise = false
+  property streaming_chunks : Array(String)? = nil
 
   def invoke(
     input_text : String,
@@ -61,6 +79,23 @@ class MockAgent < Ark::Bedrock::AgentInvoker
   ) : Ark::Bedrock::AgentResponse
     @invocations << {input_text, session_id, user_attrs, files}
     raise "agent error" if @should_raise
+    @result
+  end
+
+  def invoke_streaming(
+    input_text : String,
+    session_id : String,
+    user_attrs : Hash(String, String),
+    files : Array(Ark::Bedrock::InputFile),
+    & : String ->
+  ) : Ark::Bedrock::AgentResponse
+    @invocations << {input_text, session_id, user_attrs, files}
+    raise "agent error" if @should_raise
+    if chunks = @streaming_chunks
+      chunks.each { |chunk| yield chunk }
+    else
+      yield @result.text unless @result.text.empty?
+    end
     @result
   end
 end
@@ -89,7 +124,7 @@ class MockSocketMode < Ark::Slack::SocketMode
   end
 end
 
-private def build_gateway
+private def build_gateway(streaming : Bool = true)
   slack_api = MockSlackAPI.new
   socket_mode = MockSocketMode.new
   agent = MockAgent.new
@@ -101,6 +136,7 @@ private def build_gateway
     agent: agent,
     publisher: publisher,
     bot_token: "xoxb-fake",
+    streaming: streaming,
   )
 
   # Trigger auth_test to set bot_user_id
@@ -538,6 +574,72 @@ describe Ark::Gateway do
       input = agent.invocations[0][0]
       input.should contain("[Previous conversation context]")
       input.should contain("mention")
+    end
+  end
+
+  describe "streaming responses" do
+    it "updates message via streaming when enabled" do
+      _, slack_api, socket_mode, agent, _ = build_gateway(streaming: true)
+      agent.result = Ark::Bedrock::AgentResponse.new(text: "hello world")
+
+      socket_mode.simulate_event(dm_event("U999", "hi"))
+      2.times { Fiber.yield }
+
+      # Final response is posted via update or post_message
+      has_response = !slack_api.messages.empty? || !slack_api.updates.empty?
+      has_response.should be_true
+    end
+
+    it "falls back to post_message when streaming is disabled" do
+      _, slack_api, socket_mode, agent, _ = build_gateway(streaming: false)
+      agent.result = Ark::Bedrock::AgentResponse.new(text: "hello world")
+
+      socket_mode.simulate_event(dm_event("U999", "hi"))
+      2.times { Fiber.yield }
+
+      slack_api.messages.size.should eq(1)
+      slack_api.messages_with_ts.should be_empty
+      slack_api.updates.should be_empty
+    end
+
+    it "appends sources in final streaming update" do
+      _, slack_api, socket_mode, agent, _ = build_gateway(streaming: true)
+      agent.streaming_chunks = ["hello world, this is a longer response for testing"]
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "hello world, this is a longer response for testing",
+        sources: ["doc.pdf"],
+      )
+
+      socket_mode.simulate_event(dm_event("U999", "hi"))
+      2.times { Fiber.yield }
+
+      all_text = slack_api.messages.map { |m| m[1] }.join + slack_api.updates.map { |u| u[2] }.join
+      all_text.should contain("Sources")
+      all_text.should contain("doc.pdf")
+    end
+
+    it "uploads files after streaming completes" do
+      _, slack_api, socket_mode, agent, _ = build_gateway(streaming: true)
+      agent.result = Ark::Bedrock::AgentResponse.new(
+        text: "here is your chart",
+        files: [Ark::Bedrock::AgentFile.new(name: "chart.png", media_type: "image/png", data: "PNG".to_slice)],
+      )
+
+      socket_mode.simulate_event(dm_event("U999", "generate"))
+      2.times { Fiber.yield }
+
+      slack_api.uploaded_files.size.should eq(1)
+      slack_api.uploaded_files[0][2].should eq("chart.png")
+    end
+
+    it "posts error message when agent fails during streaming" do
+      _, slack_api, socket_mode, agent, _ = build_gateway(streaming: true)
+      agent.should_raise = true
+
+      socket_mode.simulate_event(dm_event("U999", "hi"))
+      2.times { Fiber.yield }
+
+      slack_api.messages.any? { |m| m[1] == Ark::Slack::ERROR_REPLY_TEXT }.should be_true
     end
   end
 end

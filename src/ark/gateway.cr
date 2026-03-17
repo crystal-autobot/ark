@@ -14,6 +14,7 @@ module Ark
       @publisher : AWS::EventPublisher,
       @bot_token : String,
       @session_ttl : Time::Span = DEFAULT_SESSION_TTL,
+      @streaming : Bool = true,
     )
       @bot_user_id = ""
       @users = {} of String => Hash(String, String)
@@ -130,12 +131,18 @@ module Ark
       Log.info { "processing message user=#{user_id} channel=#{channel} thread=#{thread_ts} input_files=#{files.size}" }
 
       input_text = session_stale?(session_id) ? inject_thread_context(channel, thread_ts, text) : text
-      result = @agent.invoke(input_text, session_id, user_attrs(user_id), files)
+
+      responder = StreamingResponder.new(@slack_api, channel, thread_ts) if @streaming
+
+      result = @agent.invoke_streaming(input_text, session_id, user_attrs(user_id), files) do |chunk|
+        responder.try(&.append(chunk))
+      end
       touch_session(session_id)
 
       spawn { @publisher.publish(AWS::AnalyticsEvent.new(user_id, thread_ts, text, result.text)) }
 
-      post_response(channel, thread_ts, result)
+      message_ts = responder.try(&.message_ts)
+      post_final_response(channel, thread_ts, result, message_ts)
 
       result.files.uniq(&.name).each do |file|
         @slack_api.upload_file(channel, thread_ts, file.name, file.data)
@@ -145,39 +152,59 @@ module Ark
       @slack_api.post_message(channel, Slack::ERROR_REPLY_TEXT, thread_ts)
     end
 
-    private def post_response(channel : String, thread_ts : String, result : Bedrock::AgentResponse) : Nil
+    private def post_final_response(
+      channel : String,
+      thread_ts : String,
+      result : Bedrock::AgentResponse,
+      streaming_ts : String?,
+    ) : Nil
       return if result.text.strip.empty?
 
       segments, has_table = Slack::BlockKit.parse_segments(result.text)
 
       if has_table
-        begin
-          blocks = Slack::BlockKit.build_response_blocks(segments, result.sources)
-          @slack_api.post_blocks(channel, blocks, result.text, thread_ts)
-        rescue ex
-          Log.warn(exception: ex) { "block post failed, falling back to code block tables" }
-          post_code_block_response(channel, thread_ts, segments, result.sources)
-        end
+        post_table_response(channel, thread_ts, segments, result, streaming_ts)
       else
-        post_plain_response(channel, thread_ts, result)
+        post_plain_response(channel, thread_ts, result, streaming_ts)
       end
     end
 
-    private def post_code_block_response(
+    private def post_table_response(
       channel : String,
       thread_ts : String,
       segments : Array(Slack::BlockKit::TextSegment),
-      sources : Array(String),
+      result : Bedrock::AgentResponse,
+      streaming_ts : String?,
     ) : Nil
-      response = Slack::BlockKit.render_with_code_block_tables(segments)
-      response += Slack::Mrkdwn.format_sources(sources) unless sources.empty?
-      @slack_api.post_message(channel, response, thread_ts)
+      blocks = Slack::BlockKit.build_response_blocks(segments, result.sources)
+      if streaming_ts
+        @slack_api.delete_message(channel, streaming_ts)
+      end
+      @slack_api.post_blocks(channel, blocks, result.text, thread_ts)
+    rescue ex
+      Log.warn(exception: ex) { "block post failed, falling back to code block tables" }
+      text = Slack::BlockKit.render_with_code_block_tables(segments)
+      text += Slack::Mrkdwn.format_sources(result.sources) unless result.sources.empty?
+      if streaming_ts
+        @slack_api.update_message(channel, streaming_ts, text)
+      else
+        @slack_api.post_message(channel, text, thread_ts)
+      end
     end
 
-    private def post_plain_response(channel : String, thread_ts : String, result : Bedrock::AgentResponse) : Nil
-      response = Slack::Mrkdwn.convert(result.text)
-      response += Slack::Mrkdwn.format_sources(result.sources) unless result.sources.empty?
-      @slack_api.post_message(channel, response, thread_ts)
+    private def post_plain_response(
+      channel : String,
+      thread_ts : String,
+      result : Bedrock::AgentResponse,
+      streaming_ts : String?,
+    ) : Nil
+      text = Slack::Mrkdwn.convert(result.text)
+      text += Slack::Mrkdwn.format_sources(result.sources) unless result.sources.empty?
+      if streaming_ts
+        @slack_api.update_message(channel, streaming_ts, text)
+      else
+        @slack_api.post_message(channel, text, thread_ts)
+      end
     end
 
     private def thread_timestamp(thread_ts : String?, message_ts : String) : String
@@ -221,6 +248,50 @@ module Ark
     rescue ex
       Log.warn(exception: ex) { "failed to fetch thread context channel=#{channel} thread=#{thread_ts}" }
       text
+    end
+
+    class StreamingResponder
+      UPDATE_INTERVAL   = 1.second
+      TYPING_INDICATOR  = " \u2026"
+      MIN_UPDATE_LENGTH = 20
+
+      getter message_ts : String?
+
+      def initialize(@slack_api : Slack::SlackAPI, @channel : String, @thread_ts : String)
+        @buffer = String::Builder.new
+        @last_update = Time.instant
+        @dirty = false
+      end
+
+      def append(chunk : String) : Nil
+        @buffer << chunk
+        @dirty = true
+        maybe_flush
+      end
+
+      private def maybe_flush : Nil
+        return unless @dirty
+        return if @buffer.bytesize < MIN_UPDATE_LENGTH
+        return unless Time.instant - @last_update >= UPDATE_INTERVAL
+
+        flush
+      end
+
+      private def flush : Nil
+        text = Slack::Mrkdwn.convert(@buffer.to_s) + TYPING_INDICATOR
+        ts = @message_ts
+
+        if ts
+          @slack_api.update_message(@channel, ts, text)
+        else
+          @message_ts = @slack_api.post_message_with_ts(@channel, text, @thread_ts)
+        end
+
+        @last_update = Time.instant
+        @dirty = false
+      rescue ex
+        Log.warn(exception: ex) { "streaming update failed" }
+      end
     end
 
     private def download_slack_files(slack_files : Array(JSON::Any)) : Array(Bedrock::InputFile)

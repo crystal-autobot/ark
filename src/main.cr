@@ -41,6 +41,7 @@ module Ark
       publisher: publisher,
       bot_token: config.slack_bot_token,
       session_ttl: config.session_ttl_minutes.minutes,
+      streaming: config.streaming_enabled?,
     )
 
     Log.info { "starting ark region=#{region} agent=#{config.bedrock_agent_id}" }
