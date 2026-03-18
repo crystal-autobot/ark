@@ -110,7 +110,10 @@ module Ark::Bedrock
       output_files = [] of AgentFile
 
       EventStream.decode(io) do |msg|
-        next if msg.exception?
+        if msg.exception?
+          Log.error { "bedrock exception: #{String.new(msg.payload)}" }
+          next
+        end
 
         case msg.event_type
         when "chunk"
