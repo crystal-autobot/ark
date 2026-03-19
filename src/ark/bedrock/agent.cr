@@ -84,6 +84,7 @@ module Ark::Bedrock
 
       {
         "inputText"    => JSON::Any.new(input_text),
+        "enableTrace"  => JSON::Any.new(true),
         "sessionState" => JSON::Any.new(session_state),
       }.to_json
     end
@@ -109,6 +110,11 @@ module Ark::Bedrock
       seen = Set(String).new
       output_files = [] of AgentFile
 
+      knowledge_bases = Set(String).new
+      action_groups = Set(String).new
+      search_queries = [] of String
+      rationale : String? = nil
+
       EventStream.decode(io) do |msg|
         if msg.exception?
           Log.error { "bedrock exception: #{String.new(msg.payload)}" }
@@ -120,11 +126,23 @@ module Ark::Bedrock
           parse_chunk(msg.payload, text, sources, seen)
         when "files"
           parse_files(msg.payload, output_files)
+        when "trace"
+          if r = TraceParser.parse(msg.payload, knowledge_bases, action_groups, search_queries)
+            rationale = r
+          end
         end
       end
 
-      Log.info { "bedrock response: length=#{text.bytesize} sources=#{sources.size} output_files=#{output_files.size}" }
-      AgentResponse.new(text: text.to_s, sources: sources, files: output_files)
+      trace = TraceMetadata.new(
+        knowledge_bases: knowledge_bases.to_a,
+        sources: sources,
+        action_groups: action_groups.to_a,
+        search_queries: search_queries,
+        rationale: rationale,
+      )
+
+      Log.info { "bedrock response: length=#{text.bytesize} sources=#{sources.size} output_files=#{output_files.size} kbs=#{knowledge_bases.size} action_groups=#{action_groups.size}" }
+      AgentResponse.new(text: text.to_s, sources: sources, files: output_files, trace: trace)
     end
 
     private def parse_chunk(

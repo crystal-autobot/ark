@@ -133,7 +133,16 @@ module Ark
       result = @agent.invoke(input_text, session_id, user_attrs(user_id), files)
       touch_session(session_id)
 
-      spawn { @publisher.publish(AWS::AnalyticsEvent.new(user_id, thread_ts, text, result.text)) }
+      spawn do
+        event = AWS::AnalyticsEvent.new(
+          user_id: user_id,
+          thread_id: thread_ts,
+          message_length: text.bytesize.to_i32,
+          response_length: result.text.bytesize.to_i32,
+          trace: result.trace,
+        )
+        @publisher.publish(event)
+      end
 
       post_response(channel, thread_ts, result)
 
