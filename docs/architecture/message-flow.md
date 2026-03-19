@@ -47,9 +47,11 @@ Bedrock::Agent builds signed POST request to:
 Parse streaming response (binary event stream):
   - "chunk" events → accumulate text + collect citations
   - "files" events → collect output files
+  - "trace" events → extract KB IDs, search queries,
+    rationale, sources (when analytics enabled)
         │
         ▼
-Publish analytics event to Firehose (spawned fiber)
+Publish structured analytics event to Firehose (spawned fiber)
         │
         ▼
 Format response:
