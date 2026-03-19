@@ -127,7 +127,7 @@ module Ark::Bedrock
         when "files"
           parse_files(msg.payload, output_files)
         when "trace"
-          if r = TraceParser.parse(msg.payload, knowledge_bases, action_groups, search_queries)
+          if r = TraceParser.parse(msg.payload, knowledge_bases, action_groups, search_queries, sources, seen)
             rationale = r
           end
         end
