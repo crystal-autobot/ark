@@ -20,6 +20,10 @@ module Ark
     getter log_level : String
     getter session_ttl_minutes : Int32
 
+    def analytics_enabled? : Bool
+      !@firehose_stream_name.nil?
+    end
+
     def initialize(
       @slack_bot_token : String,
       @slack_app_token : String,

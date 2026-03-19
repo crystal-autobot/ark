@@ -23,6 +23,7 @@ module Ark::Bedrock
       @alias_id : String,
       @region : String,
       @provider : AWS::CredentialProvider,
+      @enable_trace : Bool = false,
     )
       @signer = AWS::Signer.new(SIGNING_SERVICE, @region, @provider)
     end
@@ -82,7 +83,7 @@ module Ark::Bedrock
 
       {
         "inputText"    => JSON::Any.new(input_text),
-        "enableTrace"  => JSON::Any.new(true),
+        "enableTrace"  => JSON::Any.new(@enable_trace),
         "sessionState" => JSON::Any.new(session_state),
       }.to_json
     end
