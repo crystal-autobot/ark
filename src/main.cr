@@ -22,6 +22,7 @@ module Ark
       alias_id: config.bedrock_agent_alias_id,
       region: region,
       provider: provider,
+      enable_trace: config.analytics_enabled?,
     )
 
     slack_api = Slack::Client.new(config.slack_bot_token)

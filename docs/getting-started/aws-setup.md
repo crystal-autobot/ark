@@ -92,14 +92,16 @@ If using Firehose analytics, also add:
 
 ## Firehose analytics (optional)
 
-Ark can publish every interaction (user message + agent response) to a Kinesis Firehose delivery stream as newline-delimited JSON, for downstream analysis with Athena, Glue, or S3.
+Ark can publish structured analytics events to a Kinesis Firehose delivery stream as newline-delimited JSON, for downstream analysis with Athena, Glue, or S3.
+
+When analytics is enabled, Bedrock Agent tracing is also enabled to extract metadata from agent responses (knowledge bases consulted, search queries, rationale). Raw user messages and agent responses are **not** stored — only structured metadata and message lengths.
 
 To enable:
 
 1. Create a Firehose delivery stream (e.g., with S3 destination)
 2. Set `FIREHOSE_STREAM_NAME` to the stream name
 
-If `FIREHOSE_STREAM_NAME` is not set, analytics are disabled silently.
+If `FIREHOSE_STREAM_NAME` is not set, analytics and tracing are disabled silently.
 
 ### Event format
 
@@ -110,7 +112,25 @@ Each event is a JSON object:
   "timestamp": "2026-03-14T10:30:00Z",
   "user_id": "U1234567",
   "thread_id": "1710412200-123456",
-  "user_message": "What is our refund policy?",
-  "response": "According to our policy document..."
+  "message_length": 32,
+  "response_length": 485,
+  "knowledge_bases": ["RJPTLAAPUC"],
+  "sources": ["password-policy.pdf"],
+  "action_groups": [],
+  "search_queries": ["password length policy requirements"],
+  "rationale": "The user is asking about password length requirements"
 }
 ```
+
+| Field | Description |
+|---|---|
+| `timestamp` | Event time (ISO 8601) |
+| `user_id` | Slack user ID |
+| `thread_id` | Slack thread timestamp (session ID) |
+| `message_length` | User message byte size |
+| `response_length` | Agent response byte size |
+| `knowledge_bases` | Knowledge base IDs the agent consulted |
+| `sources` | Source document names cited in the response |
+| `action_groups` | Action groups invoked (e.g., CodeInterpreter) |
+| `search_queries` | Search queries the agent issued to knowledge bases |
+| `rationale` | Agent's preprocessing rationale (model-dependent, may be null) |

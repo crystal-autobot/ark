@@ -44,7 +44,10 @@ Detects markdown tables in responses and renders them as Slack Block Kit table b
 Builds and signs HTTP requests to the Bedrock Agent Runtime `InvokeAgent` API, sends them, and parses the streaming event stream response.
 
 ### `Ark::Bedrock::EventStream`
-Decodes AWS's binary event stream protocol (`application/vnd.amazon.eventstream`). Each frame contains headers and a payload — the decoder extracts text chunks, citations, and output files.
+Decodes AWS's binary event stream protocol (`application/vnd.amazon.eventstream`). Each frame contains headers and a payload — the decoder extracts text chunks, citations, output files, and trace events.
+
+### `Ark::Bedrock::TraceParser`
+Extracts structured metadata from Bedrock Agent trace events: preprocessing rationale, knowledge base IDs, search queries, action groups, and source documents from KB observations. Only active when analytics is enabled.
 
 ### `Ark::AWS::Signer`
 Wraps the `awscr-signer` library for SigV4 request signing.
@@ -53,7 +56,7 @@ Wraps the `awscr-signer` library for SigV4 request signing.
 Resolves AWS credentials from explicit environment variables or `~/.aws/credentials` profiles.
 
 ### `Ark::AWS::FirehosePublisher`
-Publishes interaction events to Kinesis Firehose as newline-delimited JSON via signed `PutRecord` requests.
+Publishes structured analytics events to Kinesis Firehose as newline-delimited JSON via signed `PutRecord` requests. Events contain trace metadata (knowledge bases, search queries, rationale) rather than raw conversation text.
 
 ## Design decisions
 

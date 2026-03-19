@@ -6,7 +6,7 @@ The codebase is organized into four main modules under `src/ark/`:
 
 - **`Ark::Slack`** — everything Slack-related: Socket Mode WebSocket connection, Web API client (messages, reactions, files, users), markdown-to-mrkdwn conversion, and Block Kit table rendering.
 
-- **`Ark::Bedrock`** — everything Bedrock-related: the Agent Runtime client with SigV4-signed requests, streaming response parsing via the AWS binary event stream protocol, session management, and file handling.
+- **`Ark::Bedrock`** — everything Bedrock-related: the Agent Runtime client with SigV4-signed requests, streaming response parsing via the AWS binary event stream protocol, trace metadata extraction, session management, and file handling.
 
 - **`Ark::AWS`** — shared AWS infrastructure: credential resolution (explicit keys or `~/.aws` profile), SigV4 signing, and the optional Firehose analytics publisher.
 

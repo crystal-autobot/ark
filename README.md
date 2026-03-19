@@ -27,7 +27,7 @@ All configuration is via environment variables:
 | `AWS_SECRET_ACCESS_KEY` | no | AWS secret key |
 | `AWS_SESSION_TOKEN` | no | AWS session token (for temporary credentials) |
 | `AWS_REGION` | no | AWS region (default: `us-east-1`, or from profile config) |
-| `FIREHOSE_STREAM_NAME` | no | Kinesis Firehose delivery stream for analytics |
+| `FIREHOSE_STREAM_NAME` | no | Kinesis Firehose stream for analytics (enables Bedrock tracing) |
 | `SESSION_TTL_MINUTES` | no | Session staleness threshold in minutes (default: `55`, range: 1-60) |
 | `LOG_LEVEL` | no | Log level: `debug`, `info`, `warn`, `error` (default: `info`) |
 

@@ -12,7 +12,7 @@ Ark connects Slack conversations to an [AWS Bedrock Agent](https://docs.aws.amaz
 - **File support** — upload files in Slack and they're sent to the agent's code interpreter
 - **Table rendering** — markdown tables in agent responses are rendered as Slack Block Kit tables
 - **Citation sources** — knowledge base sources are displayed as a bulleted list
-- **Analytics** — every interaction is optionally published to Kinesis Firehose for downstream analysis
+- **Analytics** — structured trace metadata (knowledge bases, search queries, rationale) is optionally published to Kinesis Firehose for downstream analysis
 - **AWS credential chain** — explicit keys, ECS task roles, or AWS CLI (SSO, assume-role)
 - **Minimal footprint** — single static binary, under 20 MB memory, near-zero CPU at idle
 
@@ -48,7 +48,7 @@ Slack (Socket Mode WS) ──> Ark Gateway ──> AWS Bedrock Agent
 1. Ark connects to Slack via [Socket Mode](https://api.slack.com/apis/socket-mode) (WebSocket)
 2. Incoming messages are forwarded to the configured Bedrock Agent via `InvokeAgent`
 3. The streamed response is converted from markdown to Slack's mrkdwn format and posted back
-4. Each interaction is optionally logged to Kinesis Firehose as newline-delimited JSON
+4. Structured analytics metadata is optionally published to Kinesis Firehose (no raw conversation text)
 
 ## Built with
 

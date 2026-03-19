@@ -8,11 +8,27 @@ module Ark::AWS
     getter timestamp : String
     getter user_id : String
     getter thread_id : String
-    getter user_message : String
-    getter response : String
+    getter message_length : Int32
+    getter response_length : Int32
+    getter knowledge_bases : Array(String)
+    getter sources : Array(String)
+    getter action_groups : Array(String)
+    getter search_queries : Array(String)
+    getter rationale : String?
 
-    def initialize(@user_id : String, @thread_id : String, @user_message : String, @response : String)
+    def initialize(
+      @user_id : String,
+      @thread_id : String,
+      @message_length : Int32,
+      @response_length : Int32,
+      trace : Bedrock::TraceMetadata,
+    )
       @timestamp = Time.utc.to_rfc3339
+      @knowledge_bases = trace.knowledge_bases
+      @sources = trace.sources
+      @action_groups = trace.action_groups
+      @search_queries = trace.search_queries
+      @rationale = trace.rationale
     end
   end
 
