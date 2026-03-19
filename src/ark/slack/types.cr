@@ -12,7 +12,10 @@ module Ark::Slack
   MIME_BINARY       = "binary"
   MIME_OCTET_STREAM = "application/octet-stream"
 
-  # Extension -> MIME type mapping for Bedrock code interpreter.
+  UNSUPPORTED_FILE_REPLY_TEXT = "I can't process this file type. Supported formats: CSV, PDF, Excel, Word, JSON, YAML, HTML, Markdown, and plain text."
+
+  # Extension -> MIME type mapping for Bedrock Code Interpreter supported input types.
+  # https://docs.aws.amazon.com/bedrock/latest/userguide/agents-code-interpretation.html
   EXT_MEDIA_TYPES = {
     ".csv"  => "text/csv",
     ".xls"  => "application/vnd.ms-excel",
@@ -26,14 +29,20 @@ module Ark::Slack
     ".md"   => "text/markdown",
     ".txt"  => "text/plain",
     ".pdf"  => "application/pdf",
-    ".png"  => "image/png",
   }
 
+  SUPPORTED_MEDIA_TYPES = EXT_MEDIA_TYPES.values.to_set
+
   def self.resolve_media_type(slack_mime : String?, filename : String) : String?
-    if slack_mime && slack_mime != MIME_BINARY && slack_mime != MIME_OCTET_STREAM
-      return slack_mime
-    end
     ext = File.extname(filename).downcase
-    EXT_MEDIA_TYPES[ext]?
+    if mime = EXT_MEDIA_TYPES[ext]?
+      return mime
+    end
+
+    if slack_mime && slack_mime != MIME_BINARY && slack_mime != MIME_OCTET_STREAM
+      return slack_mime if SUPPORTED_MEDIA_TYPES.includes?(slack_mime)
+    end
+
+    nil
   end
 end

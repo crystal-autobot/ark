@@ -38,10 +38,24 @@ describe Ark::Slack do
         ".md"   => "text/markdown",
         ".txt"  => "text/plain",
         ".pdf"  => "application/pdf",
-        ".png"  => "image/png",
       }.each do |ext, mime|
         Ark::Slack.resolve_media_type(nil, "file#{ext}").should eq(mime)
       end
+    end
+
+    it "rejects image files by extension" do
+      Ark::Slack.resolve_media_type(nil, "photo.png").should be_nil
+      Ark::Slack.resolve_media_type(nil, "photo.jpg").should be_nil
+    end
+
+    it "rejects image files by Slack MIME type" do
+      Ark::Slack.resolve_media_type("image/png", "photo.png").should be_nil
+      Ark::Slack.resolve_media_type("image/jpeg", "photo.jpg").should be_nil
+      Ark::Slack.resolve_media_type("image/gif", "animation.gif").should be_nil
+    end
+
+    it "prefers extension mapping over Slack MIME" do
+      Ark::Slack.resolve_media_type("application/csv", "data.csv").should eq("text/csv")
     end
   end
 end
