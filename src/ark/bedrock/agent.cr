@@ -113,10 +113,12 @@ module Ark::Bedrock
       action_groups = Set(String).new
       search_queries = [] of String
       rationale : String? = nil
+      exception_message : String? = nil
 
       EventStream.decode(io) do |msg|
         if msg.exception?
-          Log.error { "bedrock exception: #{String.new(msg.payload)}" }
+          exception_message = String.new(msg.payload)
+          Log.error { "bedrock exception: #{exception_message}" }
           next
         end
 
@@ -130,6 +132,10 @@ module Ark::Bedrock
             rationale = r
           end
         end
+      end
+
+      if text.bytesize == 0 && exception_message
+        raise "bedrock agent error: #{exception_message}"
       end
 
       trace = TraceMetadata.new(

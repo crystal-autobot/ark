@@ -62,7 +62,13 @@ module Ark
 
       return if text.empty? && !has_files
 
-      files = slack_files && has_files ? download_slack_files(slack_files) : [] of Bedrock::InputFile
+      files, skipped = slack_files && has_files ? download_slack_files(slack_files) : {[] of Bedrock::InputFile, 0}
+
+      if skipped > 0
+        spawn { @slack_api.post_message(channel, Slack::UNSUPPORTED_FILE_REPLY_TEXT, thread_ts) }
+      end
+
+      return if text.empty? && files.empty?
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
 
@@ -232,8 +238,9 @@ module Ark
       text
     end
 
-    private def download_slack_files(slack_files : Array(JSON::Any)) : Array(Bedrock::InputFile)
+    private def download_slack_files(slack_files : Array(JSON::Any)) : {Array(Bedrock::InputFile), Int32}
       files = [] of Bedrock::InputFile
+      skipped = 0
 
       slack_files.each_with_index do |slack_file, index|
         break if index >= Slack::MAX_INPUT_FILES
@@ -251,6 +258,7 @@ module Ark
         media_type = Slack.resolve_media_type(mime, name)
         unless media_type
           Log.warn { "unsupported file type: #{name} (#{mime})" }
+          skipped += 1
           next
         end
 
@@ -265,7 +273,7 @@ module Ark
         files << Bedrock::InputFile.new(name: name, media_type: media_type, data: data)
       end
 
-      files
+      {files, skipped}
     end
 
     private def fetch_file_bytes(url : String) : Bytes?
