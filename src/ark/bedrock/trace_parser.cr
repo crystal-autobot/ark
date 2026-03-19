@@ -19,6 +19,19 @@ module Ark::Bedrock
         extract_orchestration(trace, knowledge_bases, action_groups, search_queries, sources, seen_sources)
     end
 
+    def self.extract_source_name(ref : JSON::Any) : String?
+      uri = ref.dig?("location", "s3Location", "uri").try(&.as_s?)
+      return nil unless uri
+
+      name = File.basename(uri).strip
+      return nil if name.empty?
+
+      if page = ref.dig?("metadata", PAGE_NUMBER_KEY).try(&.as_s?)
+        name += ", p. #{page}"
+      end
+      name
+    end
+
     private def self.extract_preprocessing_rationale(trace : JSON::Any) : String?
       trace.dig?("preProcessingTrace", "modelInvocationOutput", "parsedResponse", "rationale")
         .try(&.as_s?)
@@ -62,13 +75,8 @@ module Ark::Bedrock
       refs = orch.dig?("observation", "knowledgeBaseLookupOutput", "retrievedReferences").try(&.as_a?) || return
 
       refs.each do |ref|
-        uri = ref.dig?("location", "s3Location", "uri").try(&.as_s?) || next
-        name = File.basename(uri).strip
-        next if name.empty? || seen_sources.includes?(name)
-
-        if page = ref.dig?("metadata", PAGE_NUMBER_KEY).try(&.as_s?)
-          name += ", p. #{page}"
-        end
+        name = extract_source_name(ref) || next
+        next if seen_sources.includes?(name)
 
         seen_sources << name
         sources << name

@@ -18,8 +18,6 @@ module Ark::Bedrock
     CONNECT_TIMEOUT = 30.seconds
     READ_TIMEOUT    = 300.seconds
 
-    PAGE_NUMBER_KEY = "x-amz-bedrock-kb-document-page-number"
-
     def initialize(
       @agent_id : String,
       @alias_id : String,
@@ -134,9 +132,9 @@ module Ark::Bedrock
       end
 
       trace = TraceMetadata.new(
-        knowledge_bases: knowledge_bases.to_a,
+        knowledge_bases: knowledge_bases.to_a.sort,
         sources: sources,
-        action_groups: action_groups.to_a,
+        action_groups: action_groups.to_a.sort,
         search_queries: search_queries,
         rationale: rationale,
       )
@@ -159,11 +157,10 @@ module Ark::Bedrock
 
       json["attribution"]?.try(&.["citations"]?).try(&.as_a).try &.each do |citation|
         citation["retrievedReferences"]?.try(&.as_a).try &.each do |ref|
-          name = extract_source_name(ref)
-          if name && !seen.includes?(name)
-            seen << name
-            sources << name
-          end
+          name = TraceParser.extract_source_name(ref) || next
+          next if seen.includes?(name)
+          seen << name
+          sources << name
         end
       end
     end
@@ -190,23 +187,6 @@ module Ark::Bedrock
           data: data,
         )
       end
-    end
-
-    private def extract_source_name(ref : JSON::Any) : String?
-      uri = ref.dig?("location", "s3Location", "uri").try(&.as_s?)
-      return nil unless uri
-
-      name = File.basename(uri).strip
-      return nil if name.empty?
-
-      if page = extract_page_number(ref["metadata"]?)
-        name += ", p. #{page}"
-      end
-      name
-    end
-
-    private def extract_page_number(metadata : JSON::Any?) : String?
-      metadata.try(&.[PAGE_NUMBER_KEY]?).try(&.as_s?)
     end
   end
 end
