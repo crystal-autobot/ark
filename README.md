@@ -8,7 +8,9 @@ A lightweight, high-performance Slack gateway for AWS Bedrock Agents. Single sta
 Slack thread timestamps are used as Bedrock session IDs, so follow-up messages in the same thread maintain conversation context.
 When a Bedrock session expires (1h idle), Ark automatically restores context from the Slack thread history.
 
-![Demo](docs/assets/demo.png)
+| Code interpreter | Jira integration |
+|---|---|
+| ![Code interpreter](docs/assets/salary-correlation.gif) | ![Jira integration](docs/assets/velocity.gif) |
 
 ## Why Ark?
 
