@@ -4,20 +4,18 @@ Ark is structured as a gateway that bridges two systems: Slack (via Socket Mode 
 
 ## Component diagram
 
-```
-┌─────────────────────────────────────────────────────┐
-│                      Ark Gateway                     │
-│                                                      │
-│  ┌──────────────┐   ┌────────────┐   ┌───────────┐ │
-│  │ Socket Mode  │──>│  Gateway   │──>│  Bedrock   │ │
-│  │ (WebSocket)  │   │ (router)   │   │  Agent     │ │
-│  └──────────────┘   └─────┬──────┘   └───────────┘ │
-│                           │                          │
-│                     ┌─────┴──────┐                   │
-│                     │  Firehose  │                   │
-│                     │ (optional) │                   │
-│                     └────────────┘                   │
-└─────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    Slack["Slack"] <-->|"Socket Mode<br/>(WebSocket)"| SM
+
+    subgraph ark["Ark Gateway"]
+        SM["Socket Mode"] --> GW["Gateway"]
+        GW --> BC["Bedrock Client"]
+        GW -.-> FP["Firehose Publisher"]
+    end
+
+    BC -->|"InvokeAgent<br/>(streaming)"| Bedrock["AWS Bedrock<br/>Agent"]
+    FP -.->|"PutRecord"| Firehose["AWS Kinesis<br/>Firehose"]
 ```
 
 ## Key modules

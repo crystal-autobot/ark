@@ -1,5 +1,16 @@
 # Project structure
 
+## Module overview
+
+```mermaid
+graph TD
+    Config["Ark::Config"] --> GW["Ark::Gateway"]
+    GW --> S["Ark::Slack"]
+    GW --> B["Ark::Bedrock"]
+    GW --> A["Ark::AWS"]
+    B --> A
+```
+
 The codebase is organized into four main modules under `src/ark/`:
 
 - **`Ark::Gateway`** — the central orchestrator that ties everything together. Handles the event loop, routes messages and mentions, invokes the agent, and posts responses.

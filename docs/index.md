@@ -39,10 +39,11 @@ See [Getting started](getting-started/installation.md) for the full setup guide.
 
 ## How it works
 
-```
-Slack (Socket Mode WS) ──> Ark Gateway ──> AWS Bedrock Agent
-                              │
-                              └──> AWS Firehose (optional analytics)
+```mermaid
+graph LR
+    A["Slack"] <-->|"Socket Mode<br/>(WebSocket)"| B["Ark Gateway"]
+    B -->|"InvokeAgent<br/>(streaming)"| C["AWS Bedrock<br/>Agent"]
+    B -.->|"Analytics<br/>(optional)"| D["AWS Kinesis<br/>Firehose"]
 ```
 
 1. Ark connects to Slack via [Socket Mode](https://api.slack.com/apis/socket-mode) (WebSocket)
