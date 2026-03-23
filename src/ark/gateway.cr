@@ -96,7 +96,7 @@ module Ark
       ts = event["ts"]?.try(&.as_s?) || return
       thread_ts = thread_timestamp(event["thread_ts"]?.try(&.as_s?), ts)
 
-      text = Slack::Mrkdwn.strip_mentions(event["text"]?.try(&.as_s?) || "")
+      text = Slack::Mrkdwn.strip_mention(event["text"]?.try(&.as_s?) || "", @bot_user_id)
       return if text.empty?
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
@@ -136,6 +136,7 @@ module Ark
       Log.info { "processing message user=#{user_id} channel=#{channel} thread=#{thread_ts} input_files=#{files.size}" }
 
       input_text = session_stale?(session_id) ? inject_thread_context(channel, thread_ts, text) : text
+      input_text = resolve_mentions(input_text)
       result = @agent.invoke(input_text, session_id, user_attrs(user_id), files)
       touch_session(session_id)
 
@@ -197,6 +198,12 @@ module Ark
 
     private def thread_timestamp(thread_ts : String?, message_ts : String) : String
       thread_ts && !thread_ts.empty? ? thread_ts : message_ts
+    end
+
+    private def resolve_mentions(text : String) : String
+      Slack::Mrkdwn.resolve_mentions(text) do |uid|
+        user_attrs(uid)["user_name"]?
+      end
     end
 
     private def user_attrs(user_id : String) : Hash(String, String)
