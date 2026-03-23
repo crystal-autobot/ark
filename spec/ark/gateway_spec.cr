@@ -430,6 +430,41 @@ describe Ark::Gateway do
     end
   end
 
+  describe "mention resolution" do
+    it "resolves user mentions in DMs" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.user_info_result = Ark::Slack::UserInfo.new(name: "Alice")
+
+      socket_mode.simulate_event(dm_event("U999", "ask <@U555> about it"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(1)
+      agent.invocations[0][0].should eq("ask @Alice about it")
+    end
+
+    it "resolves user mentions in app mentions" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.user_info_result = Ark::Slack::UserInfo.new(name: "Bob")
+
+      socket_mode.simulate_event(mention_event("U999", "<@UBOT> ask <@U555> about it"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(1)
+      agent.invocations[0][0].should eq("ask @Bob about it")
+    end
+
+    it "leaves mentions unchanged when user info has no name" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.user_info_result = Ark::Slack::UserInfo.new
+
+      socket_mode.simulate_event(dm_event("U999", "ask <@U555> about it"))
+      2.times { Fiber.yield }
+
+      agent.invocations.size.should eq(1)
+      agent.invocations[0][0].should eq("ask <@U555> about it")
+    end
+  end
+
   describe "thread context restoration" do
     it "injects context on first message in thread (session unknown)" do
       _, slack_api, socket_mode, agent, _ = build_gateway

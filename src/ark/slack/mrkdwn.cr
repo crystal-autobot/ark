@@ -1,13 +1,13 @@
 module Ark::Slack::Mrkdwn
-  MENTION_RE     = /<@\w+>\s*/
-  BOLD_RE        = /\*\*(.+?)\*\*/
-  STRIKE_RE      = /~~(.+?)~~/
-  BACKTICK_RE    = /`([^`]+)`/
-  ITALIC_RE      = /(?<!\*)\*([^*]+)\*(?!\*)/
-  LINK_RE        = /\[([^\]]+)\]\(([^)]+)\)/
-  HEADING_RE     = Regex.new(%q(^\#{1,6}\s+([^\n]+)$), Regex::Options::MULTILINE)
-  BLANK_LINES_RE = /\n{3,}/
-  CODE_FENCE_RE  = /```[\s\S]*?```/
+  MENTION_CAPTURE_RE = /<@(\w+)>/
+  BOLD_RE            = /\*\*(.+?)\*\*/
+  STRIKE_RE          = /~~(.+?)~~/
+  BACKTICK_RE        = /`([^`]+)`/
+  ITALIC_RE          = /(?<!\*)\*([^*]+)\*(?!\*)/
+  LINK_RE            = /\[([^\]]+)\]\(([^)]+)\)/
+  HEADING_RE         = Regex.new(%q(^\#{1,6}\s+([^\n]+)$), Regex::Options::MULTILINE)
+  BLANK_LINES_RE     = /\n{3,}/
+  CODE_FENCE_RE      = /```[\s\S]*?```/
 
   # Slack control tokens that could trigger mass notifications or impersonate mentions.
   BROADCAST_RE    = /<!(?:channel|here|everyone)>/
@@ -46,9 +46,22 @@ module Ark::Slack::Mrkdwn
     end
   end
 
-  # Strips @mentions from message text.
-  def self.strip_mentions(text : String) : String
-    text.gsub(MENTION_RE, "").strip
+  # Strips a specific user's @mention from message text.
+  def self.strip_mention(text : String, user_id : String) : String
+    mention = "<@#{user_id}>"
+    text.gsub("#{mention} ", "").gsub(mention, "").strip
+  end
+
+  # Replaces <@USERID> mentions with @Name using the provided resolver.
+  def self.resolve_mentions(text : String, &resolver : String -> String?) : String
+    text.gsub(MENTION_CAPTURE_RE) do |match|
+      uid = $~[1]
+      if name = resolver.call(uid)
+        "@#{name}"
+      else
+        match
+      end
+    end
   end
 
   # Splits text at paragraph boundaries if it exceeds max_len.

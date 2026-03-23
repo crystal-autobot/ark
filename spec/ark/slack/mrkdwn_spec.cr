@@ -113,21 +113,49 @@ describe Ark::Slack::Mrkdwn do
     end
   end
 
-  describe ".strip_mentions" do
-    it "strips single mention" do
-      Ark::Slack::Mrkdwn.strip_mentions("<@U123> hello").should eq("hello")
+  describe ".strip_mention" do
+    it "strips the specified user's mention" do
+      Ark::Slack::Mrkdwn.strip_mention("<@U123> hello", "U123").should eq("hello")
     end
 
-    it "strips multiple mentions" do
-      Ark::Slack::Mrkdwn.strip_mentions("<@U123> <@U456> hello").should eq("hello")
+    it "preserves other users' mentions" do
+      Ark::Slack::Mrkdwn.strip_mention("<@UBOT> ask <@U456> about it", "UBOT").should eq("ask <@U456> about it")
     end
 
     it "handles mention-only text" do
-      Ark::Slack::Mrkdwn.strip_mentions("<@U123>").should eq("")
+      Ark::Slack::Mrkdwn.strip_mention("<@U123>", "U123").should eq("")
     end
 
     it "preserves text without mentions" do
-      Ark::Slack::Mrkdwn.strip_mentions("hello world").should eq("hello world")
+      Ark::Slack::Mrkdwn.strip_mention("hello world", "U123").should eq("hello world")
+    end
+  end
+
+  describe ".resolve_mentions" do
+    it "replaces mentions with resolved names" do
+      result = Ark::Slack::Mrkdwn.resolve_mentions("ask <@U123> about it") do |uid|
+        uid == "U123" ? "Alice" : nil
+      end
+      result.should eq("ask @Alice about it")
+    end
+
+    it "leaves unresolved mentions unchanged" do
+      result = Ark::Slack::Mrkdwn.resolve_mentions("ask <@U999>") do |_uid|
+        nil
+      end
+      result.should eq("ask <@U999>")
+    end
+
+    it "resolves multiple mentions" do
+      result = Ark::Slack::Mrkdwn.resolve_mentions("<@U1> and <@U2>") do |uid|
+        {"U1" => "Alice", "U2" => "Bob"}[uid]?
+      end
+      result.should eq("@Alice and @Bob")
+    end
+
+    it "preserves text without mentions" do
+      result = Ark::Slack::Mrkdwn.resolve_mentions("hello world") { |_| nil }
+      result.should eq("hello world")
     end
   end
 
