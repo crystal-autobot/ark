@@ -38,7 +38,7 @@ The Bedrock Agent defines *what* the assistant can do. Ark makes it available *w
 - **Rate limit handling** - automatic retry with exponential backoff for Slack API throttling
 - **Analytics** - optional Kinesis Firehose stream for structured trace events (KB queries, action groups, sources) without logging conversation text
 - **Security** - mention/broadcast injection prevention, HTTPS-only file downloads, SigV4 request signing
-- **Flexible credentials** - auto-resolves AWS credentials from environment variables, ECS task role, or AWS CLI (SSO, assume-role, instance profile)
+- **Flexible credentials** - auto-resolves AWS credentials from environment variables, ECS/EKS roles, AWS CLI (SSO, assume-role) or EC2 instance profile
 - **Minimal footprint** - single static binary, under 20 MB memory, near-zero idle CPU
 
 ## Prerequisites
@@ -65,7 +65,7 @@ All configuration is via environment variables:
 | `SESSION_TTL_MINUTES` | no | Session staleness threshold in minutes (default: `55`, range: 1-60) |
 | `LOG_LEVEL` | no | Log level: `debug`, `info`, `warn`, `error` (default: `info`) |
 
-AWS credentials are resolved automatically: explicit keys > ECS task role > AWS CLI (SSO, assume-role, instance profile).
+AWS credentials are resolved automatically: explicit keys > ECS/EKS container role > IRSA web identity > AWS CLI (SSO, assume-role) > EC2 instance profile.
 
 ## Development
 

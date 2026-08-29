@@ -1,6 +1,7 @@
 require "./ark/version"
 require "./ark/config"
 require "./ark/aws/*"
+require "./ark/aws/credential_sources/*"
 require "./ark/bedrock/*"
 require "./ark/slack/*"
 require "./ark/sessions"

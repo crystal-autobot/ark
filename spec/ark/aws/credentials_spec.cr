@@ -21,10 +21,19 @@ private def resolve_with_env(**extra) : Ark::AWS::ResolvedCredentials
 end
 
 describe Ark::AWS::Credentials do
-  describe ".resolve_cli" do
-    it "raises when aws CLI is not available or profile fails" do
-      expect_raises(Exception, /AWS/) do
-        Ark::AWS::Credentials.resolve_cli("nonexistent-profile-#{Random.new.hex(8)}")
+  describe ".from_json" do
+    it "parses credentials with expiry" do
+      resolved = Ark::AWS::Credentials.from_json(
+        %({"AccessKeyId":"AK","SecretAccessKey":"SK","Token":"TK","Expiration":"2030-01-01T00:00:00Z"}),
+        "test",
+      )
+      resolved.credentials.session_token.should eq("TK")
+      resolved.expires_at.should eq(Time.utc(2030, 1, 1))
+    end
+
+    it "raises on incomplete credentials" do
+      expect_raises(Exception, /incomplete/) do
+        Ark::AWS::Credentials.from_json(%({"AccessKeyId":"AK"}), "test")
       end
     end
   end

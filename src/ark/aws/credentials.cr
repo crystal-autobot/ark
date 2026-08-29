@@ -1,5 +1,4 @@
 require "json"
-require "http/client"
 
 module Ark::AWS
   record ResolvedCredentials, credentials : Credentials, expires_at : Time?
@@ -12,7 +11,6 @@ module Ark::AWS
     def initialize(@access_key_id : String, @secret_access_key : String, @session_token : String? = nil)
     end
 
-    # Resolves credentials with optional expiry information.
     def self.resolve(config : Config) : ResolvedCredentials
       if (key_id = config.aws_access_key_id) && (secret = config.aws_secret_access_key)
         Log.info { "using explicit AWS credentials" }
@@ -20,59 +18,33 @@ module Ark::AWS
         return ResolvedCredentials.new(credentials: creds, expires_at: nil)
       end
 
-      if ENV["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"]?
-        Log.info { "using ECS container credentials" }
-        return resolve_ecs_metadata
+      if CredentialSources::Container.available?
+        Log.info { "using container credentials" }
+        return CredentialSources::Container.resolve
       end
 
-      label = config.aws_profile.try { |profile| " (profile: #{profile})" }
-      Log.info { "using AWS CLI credentials#{label}" }
-      resolve_cli(config.aws_profile)
-    end
-
-    def self.resolve_ecs_metadata : ResolvedCredentials
-      relative_uri = ENV["AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"]
-      resp = HTTP::Client.get("http://169.254.170.2#{relative_uri}")
-
-      unless resp.success?
-        raise "ECS metadata endpoint returned #{resp.status_code}"
+      if CredentialSources::WebIdentity.available?
+        Log.info { "using web identity credentials" }
+        return CredentialSources::WebIdentity.resolve(config.aws_region)
       end
 
-      parse_resolved_json(resp.body, "ECS metadata")
-    end
-
-    def self.resolve_cli(profile : String? = nil) : ResolvedCredentials
-      args = ["configure", "export-credentials"]
-      args += ["--profile", profile] if profile
-
-      output = IO::Memory.new
-      error = IO::Memory.new
-
-      begin
-        status = Process.run("aws", args, output: output, error: error)
-      rescue File::NotFoundError
-        raise "AWS CLI not found. Install it or provide AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY"
+      if CredentialSources::Cli.available?
+        label = config.aws_profile.try { |profile| " (profile: #{profile})" }
+        Log.info { "using AWS CLI credentials#{label}" }
+        return CredentialSources::Cli.resolve(config.aws_profile)
       end
 
-      unless status.success?
-        label = profile ? "profile [#{profile}]" : "default chain"
-        raise "failed to export AWS credentials (#{label}): #{error.to_s.strip}"
-      end
-
-      parse_resolved_json(output.to_s, "AWS CLI")
+      Log.info { "using EC2 instance profile credentials" }
+      resolve_instance_profile
     end
 
-    # Reads region from ~/.aws/config for the given profile.
-    def self.region_from_profile(profile : String) : String?
-      config_path = File.join(aws_config_dir, "config")
-      return unless File.exists?(config_path)
-
-      section_name = profile == "default" ? "default" : "profile #{profile}"
-      section = parse_ini_section(config_path, section_name)
-      section["region"]?
+    private def self.resolve_instance_profile : ResolvedCredentials
+      CredentialSources::Imds.resolve
+    rescue ex
+      raise "no AWS credentials found (#{ex.message}). Provide AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, install the AWS CLI, or run with an IAM role"
     end
 
-    private def self.parse_resolved_json(body : String, source : String) : ResolvedCredentials
+    def self.from_json(body : String, source : String) : ResolvedCredentials
       json = JSON.parse(body)
       access_key = json["AccessKeyId"]?.try(&.as_s?)
       secret_key = json["SecretAccessKey"]?.try(&.as_s?)
@@ -95,6 +67,16 @@ module Ark::AWS
       end
 
       ResolvedCredentials.new(credentials: creds, expires_at: expires_at)
+    end
+
+    # Reads region from ~/.aws/config for the given profile.
+    def self.region_from_profile(profile : String) : String?
+      config_path = File.join(aws_config_dir, "config")
+      return unless File.exists?(config_path)
+
+      section_name = profile == "default" ? "default" : "profile #{profile}"
+      section = parse_ini_section(config_path, section_name)
+      section["region"]?
     end
 
     private def self.aws_config_dir : String

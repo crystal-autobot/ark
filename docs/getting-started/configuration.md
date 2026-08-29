@@ -56,8 +56,12 @@ LOG_LEVEL=info
 ## Credential resolution order
 
 1. If `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are set, use them
-2. If running on ECS, read task role credentials from the container metadata endpoint
-3. Otherwise, use the AWS CLI (`aws configure export-credentials`) — supports SSO, assume-role, instance profiles
+2. If running on ECS or EKS Pod Identity, read role credentials from the container credentials endpoint (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` or `AWS_CONTAINER_CREDENTIALS_FULL_URI`, with the optional authorization token)
+3. If running on EKS with IRSA (`AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN`), assume the role through STS
+4. If the AWS CLI is installed, use `aws configure export-credentials` — supports SSO, assume-role, named profiles
+5. Otherwise, read the EC2 instance profile from the instance metadata service (IMDSv2)
+
+Temporary credentials from steps 2–5 are refreshed automatically before they expire.
 
 ## Region resolution order
 
