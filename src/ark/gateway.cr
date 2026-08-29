@@ -2,10 +2,9 @@ require "http/client"
 
 module Ark
   class Gateway
-    MAX_CONCURRENT_REQUESTS   =  10
-    THREAD_REPLIES_LIMIT      = 200
-    DEFAULT_SESSION_TTL       = 55.minutes
-    SESSION_CLEANUP_THRESHOLD = 1000
+    MAX_CONCURRENT_REQUESTS =  10
+    THREAD_REPLIES_LIMIT    = 200
+    DEFAULT_SESSION_TTL     = 55.minutes
 
     def initialize(
       @slack_api : Slack::SlackAPI,
@@ -17,7 +16,7 @@ module Ark
     )
       @bot_user_id = ""
       @users = {} of String => Hash(String, String)
-      @sessions = {} of String => Time
+      @sessions = Sessions.new(@session_ttl)
       @semaphore = Channel(Nil).new(MAX_CONCURRENT_REQUESTS)
       MAX_CONCURRENT_REQUESTS.times { @semaphore.send(nil) }
     end
@@ -112,16 +111,18 @@ module Ark
       session_id : String,
       files : Array(Bedrock::InputFile),
     ) : Nil
-      select
-      when @semaphore.receive
-        begin
-          respond(user_id, channel, text, thread_ts, session_id, files)
-        ensure
-          @semaphore.send(nil)
+      @sessions.synchronize(session_id) do
+        select
+        when @semaphore.receive
+          begin
+            respond(user_id, channel, text, thread_ts, session_id, files)
+          ensure
+            @semaphore.send(nil)
+          end
+        else
+          Log.warn { "request dropped: concurrency limit reached user=#{user_id}" }
+          @slack_api.post_message(channel, Slack::BUSY_REPLY_TEXT, thread_ts)
         end
-      else
-        Log.warn { "request dropped: concurrency limit reached user=#{user_id}" }
-        @slack_api.post_message(channel, Slack::BUSY_REPLY_TEXT, thread_ts)
       end
     end
 
@@ -135,10 +136,10 @@ module Ark
     ) : Nil
       Log.info { "processing message user=#{user_id} channel=#{channel} thread=#{thread_ts} input_files=#{files.size}" }
 
-      input_text = session_stale?(session_id) ? inject_thread_context(channel, thread_ts, text) : text
+      input_text = @sessions.stale?(session_id) ? inject_thread_context(channel, thread_ts, text) : text
       input_text = resolve_mentions(input_text)
       result = @agent.invoke(input_text, session_id, user_attrs(user_id), files)
-      touch_session(session_id)
+      @sessions.touch(session_id)
 
       spawn do
         event = AWS::AnalyticsEvent.new(
@@ -213,22 +214,6 @@ module Ark
       attrs = info.to_attrs
       @users[user_id] = attrs
       attrs
-    end
-
-    private def session_stale?(session_id : String) : Bool
-      last_used = @sessions[session_id]?
-      return true unless last_used
-      Time.utc - last_used > @session_ttl
-    end
-
-    private def touch_session(session_id : String) : Nil
-      @sessions[session_id] = Time.utc
-      evict_stale_sessions if @sessions.size > SESSION_CLEANUP_THRESHOLD
-    end
-
-    private def evict_stale_sessions : Nil
-      cutoff = Time.utc - @session_ttl * 2
-      @sessions.reject! { |_, last_used| last_used < cutoff }
     end
 
     private def inject_thread_context(channel : String, thread_ts : String, text : String) : String
