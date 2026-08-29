@@ -113,10 +113,10 @@ module Ark::Bedrock
     end
 
     private def self.read_header_name(data : Bytes, pos : Int32) : {String, UInt8, Int32}?
-      return nil if pos + 1 > data.size
+      return if pos + 1 > data.size
       name_len = data[pos].to_i32
       pos += 1
-      return nil if pos + name_len + 1 > data.size
+      return if pos + name_len + 1 > data.size
       name = String.new(data[pos, name_len])
       pos += name_len
       header_type = data[pos]
@@ -125,7 +125,7 @@ module Ark::Bedrock
     end
 
     private def self.read_variable_length(data : Bytes, pos : Int32) : {Int32, Int32}?
-      return nil if pos + 2 > data.size
+      return if pos + 2 > data.size
       value_len = (data[pos].to_u16 << 8 | data[pos + 1].to_u16).to_i32
       {value_len, pos + 2}
     end

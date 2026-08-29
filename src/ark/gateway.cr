@@ -287,7 +287,7 @@ module Ark
       uri = URI.parse(url)
       unless uri.scheme == "https" && uri.host.try(&.ends_with?(".slack.com"))
         Log.warn { "file download rejected: not a slack HTTPS URL" }
-        return nil
+        return
       end
 
       client = HTTP::Client.new(uri)
@@ -298,13 +298,13 @@ module Ark
 
       unless resp.success?
         Log.warn { "file download failed: #{resp.status_code}" }
-        return nil
+        return
       end
 
       data = resp.body.to_slice
       if data.size > Slack::MAX_INPUT_FILE_SIZE
         Log.warn { "downloaded file exceeds size limit: #{data.size}" }
-        return nil
+        return
       end
 
       data

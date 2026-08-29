@@ -76,9 +76,9 @@ module Ark::Slack::BlockKit
         next if rows.empty?
 
         block_rows = rows.map do |row|
-          JSON::Any.new(row.map { |cell|
+          JSON::Any.new(row.map do |cell|
             JSON::Any.new({"type" => JSON::Any.new("raw_text"), "text" => JSON::Any.new(Mrkdwn.strip_markdown(cell))})
-          })
+          end)
         end
 
         blocks << JSON::Any.new({
