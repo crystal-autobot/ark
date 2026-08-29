@@ -11,8 +11,11 @@ release: ## Build optimized binary
 test: ## Run specs
 	crystal spec
 
-lint: ## Run ameba linter
+lint: bin/ameba ## Run ameba linter
 	./bin/ameba src/
+
+bin/ameba:
+	shards build ameba
 
 format: ## Format source files
 	crystal tool format src/ spec/

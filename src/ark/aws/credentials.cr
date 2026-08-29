@@ -65,7 +65,7 @@ module Ark::AWS
     # Reads region from ~/.aws/config for the given profile.
     def self.region_from_profile(profile : String) : String?
       config_path = File.join(aws_config_dir, "config")
-      return nil unless File.exists?(config_path)
+      return unless File.exists?(config_path)
 
       section_name = profile == "default" ? "default" : "profile #{profile}"
       section = parse_ini_section(config_path, section_name)

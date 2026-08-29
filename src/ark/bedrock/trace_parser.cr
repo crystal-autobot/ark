@@ -13,7 +13,7 @@ module Ark::Bedrock
       seen_sources : Set(String),
     ) : String?
       json = JSON.parse(String.new(payload))
-      trace = json["trace"]? || return nil
+      trace = json["trace"]? || return
 
       extract_preprocessing_rationale(trace) ||
         extract_orchestration(trace, knowledge_bases, action_groups, search_queries, sources, seen_sources)
@@ -21,10 +21,10 @@ module Ark::Bedrock
 
     def self.extract_source_name(ref : JSON::Any) : String?
       uri = ref.dig?("location", "s3Location", "uri").try(&.as_s?)
-      return nil unless uri
+      return unless uri
 
       name = File.basename(uri).strip
-      return nil if name.empty?
+      return if name.empty?
 
       if page = ref.dig?("metadata", PAGE_NUMBER_KEY).try(&.as_s?)
         name += ", p. #{page}"
@@ -46,7 +46,7 @@ module Ark::Bedrock
       sources : Array(String),
       seen_sources : Set(String),
     ) : String?
-      orch = trace["orchestrationTrace"]? || return nil
+      orch = trace["orchestrationTrace"]? || return
 
       if kb_id = orch.dig?("invocationInput", "knowledgeBaseLookupInput", "knowledgeBaseId").try(&.as_s?)
         knowledge_bases << kb_id

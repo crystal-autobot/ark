@@ -11,11 +11,11 @@ module Ark::Slack
       bot_user_id : String,
       budget : Int32 = DEFAULT_BUDGET,
     ) : String?
-      return nil if messages.size <= 1
+      return if messages.size <= 1
 
       history = messages[0...-1]
       lines = history.compact_map { |msg| format_message(msg, bot_user_id) }
-      return nil if lines.empty?
+      return if lines.empty?
 
       select_within_budget(lines, budget)
     end
@@ -31,7 +31,7 @@ module Ark::Slack
         used += cost
       end
 
-      return nil if selected.empty?
+      return if selected.empty?
       selected.reverse!
 
       dropped = lines.size - selected.size
@@ -48,11 +48,11 @@ module Ark::Slack
 
     private def self.format_message(msg : JSON::Any, bot_user_id : String) : String?
       subtype = msg["subtype"]?.try(&.as_s?)
-      return nil if subtype && subtype != "file_share"
+      return if subtype && subtype != "file_share"
 
       text = msg["text"]?.try(&.as_s?)
-      return nil if text.nil? || text.strip.empty?
-      return nil if text == ERROR_REPLY_TEXT || text == BUSY_REPLY_TEXT
+      return if text.nil? || text.strip.empty?
+      return if text == ERROR_REPLY_TEXT || text == BUSY_REPLY_TEXT
 
       label = build_label(msg, bot_user_id)
       truncated = truncate(text, MAX_MESSAGE_LENGTH)
