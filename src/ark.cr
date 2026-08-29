@@ -1,4 +1,3 @@
-require "./ark/version"
 require "./ark/config"
 require "./ark/aws/*"
 require "./ark/aws/credential_sources/*"
