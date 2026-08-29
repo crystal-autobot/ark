@@ -21,7 +21,7 @@ docker run \
   ark
 ```
 
-On ECS with a task role, omit the AWS key variables — credentials are resolved automatically via the container metadata endpoint.
+On ECS, EKS (Pod Identity or IRSA) or EC2 with an instance profile, omit the AWS key variables — credentials are resolved automatically from the role. The image does not include the AWS CLI, so named profiles and SSO are only available when running the binary directly.
 
 ## Image details
 
