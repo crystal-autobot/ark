@@ -14,6 +14,14 @@ describe Ark::Slack::Mrkdwn do
       Ark::Slack::Mrkdwn.convert("[click](https://example.com)").should eq("<https://example.com|click>")
     end
 
+    it "converts mailto links" do
+      Ark::Slack::Mrkdwn.convert("[mail](mailto:a@b.c)").should eq("<mailto:a@b.c|mail>")
+    end
+
+    it "leaves links with non-URL targets untouched" do
+      Ark::Slack::Mrkdwn.convert("[all](!channel) [bob](@U0123ABC)").should eq("[all](!channel) [bob](@U0123ABC)")
+    end
+
     it "converts headings to bold" do
       Ark::Slack::Mrkdwn.convert("## Section title").should eq("*Section title*")
     end
@@ -82,6 +90,14 @@ describe Ark::Slack::Mrkdwn do
       result.should_not contain("<!here>")
     end
 
+    it "escapes labelled broadcasts and mentions" do
+      Ark::Slack::Mrkdwn.sanitize("<!here|here> <@U123|bob>").should eq("&lt;!here|here&gt; &lt;@U123|bob&gt;")
+    end
+
+    it "escapes user group mentions" do
+      Ark::Slack::Mrkdwn.sanitize("<!subteam^S123|@team>").should eq("&lt;!subteam^S123|@team&gt;")
+    end
+
     it "preserves normal text" do
       Ark::Slack::Mrkdwn.sanitize("hello world").should eq("hello world")
     end
@@ -97,6 +113,16 @@ describe Ark::Slack::Mrkdwn do
     it "neutralizes user mentions in output" do
       result = Ark::Slack::Mrkdwn.convert("Contact <@U999ZZZ> for help")
       result.should_not contain("<@U999ZZZ>")
+    end
+
+    it "neutralizes control tokens inside code blocks" do
+      result = Ark::Slack::Mrkdwn.convert("```\n<!channel>\n```")
+      result.should_not contain("<!channel>")
+    end
+
+    it "does not produce control tokens from markdown links" do
+      result = Ark::Slack::Mrkdwn.convert("[all](!channel) and [bob](@U0123ABC) and [x](<!here>)")
+      result.should_not match(/<[!@]/)
     end
   end
 

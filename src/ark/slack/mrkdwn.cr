@@ -10,17 +10,18 @@ module Ark::Slack::Mrkdwn
   CODE_FENCE_RE      = /```[\s\S]*?```/
 
   # Slack control tokens that could trigger mass notifications or impersonate mentions.
-  BROADCAST_RE    = /<!(?:channel|here|everyone)>/
-  USER_MENTION_RE = /<@[A-Z0-9]+>/
+  BROADCAST_RE    = /<![^>]*>/
+  USER_MENTION_RE = /<@[^>]*>/
+  LINK_SCHEME_RE  = /\A(?:https?:\/\/|mailto:)/i
 
   # Converts common markdown to Slack mrkdwn format, preserving code blocks.
   # Neutralizes Slack control tokens to prevent mention/broadcast injection.
   def self.convert(text : String) : String
-    text = sanitize(text)
     parts = split_code_blocks(text)
-    parts.map_with_index do |part, index|
+    converted = parts.map_with_index do |part, index|
       index.odd? ? part : convert_prose(part)
-    end.join.strip
+    end.join
+    sanitize(converted).strip
   end
 
   # Escapes Slack control tokens that could trigger notifications or impersonate users.
@@ -107,9 +108,16 @@ module Ark::Slack::Mrkdwn
   private def self.convert_prose(text : String) : String
     text = text.gsub(BOLD_RE, "*\\1*")
     text = text.gsub(STRIKE_RE, "~\\1~")
-    text = text.gsub(LINK_RE, "<\\2|\\1>")
+    text = convert_links(text)
     text = text.gsub(HEADING_RE, "*\\1*")
     text.gsub(BLANK_LINES_RE, "\n\n")
+  end
+
+  private def self.convert_links(text : String) : String
+    text.gsub(LINK_RE) do |match|
+      label, target = $~[1], $~[2]
+      target.matches?(LINK_SCHEME_RE) ? "<#{target}|#{label}>" : match
+    end
   end
 
   private def self.find_split_point(text : String, max_len : Int32) : Int32
