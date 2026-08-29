@@ -50,8 +50,11 @@ end
 
 class MockAgent < Ark::Bedrock::AgentInvoker
   getter invocations = [] of {String, String, Hash(String, String), Array(Ark::Bedrock::InputFile)}
+  getter max_concurrent = 0
   property result = Ark::Bedrock::AgentResponse.new(text: "ok")
   property should_raise = false
+  property delay : Time::Span = 0.seconds
+  @in_flight = 0
 
   def invoke(
     input_text : String,
@@ -61,7 +64,16 @@ class MockAgent < Ark::Bedrock::AgentInvoker
   ) : Ark::Bedrock::AgentResponse
     @invocations << {input_text, session_id, user_attrs, files}
     raise "agent error" if @should_raise
+    track_concurrency { sleep @delay }
     @result
+  end
+
+  private def track_concurrency(&) : Nil
+    @in_flight += 1
+    @max_concurrent = Math.max(@max_concurrent, @in_flight)
+    yield
+  ensure
+    @in_flight -= 1
   end
 end
 
@@ -152,6 +164,24 @@ describe Ark::Gateway do
       agent.invocations[0][0].should eq("hello")
       slack_api.messages.size.should eq(1)
       slack_api.messages[0][0].should eq("D123")
+    end
+
+    it "serializes concurrent messages in the same thread" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      agent.delay = 20.milliseconds
+      slack_api.thread_replies = [
+        thread_message("U999", "earlier"),
+        thread_message("U999", "first"),
+      ]
+
+      socket_mode.simulate_event(dm_event("U999", "first", ts: "1.1", thread_ts: "1.0"))
+      socket_mode.simulate_event(dm_event("U999", "second", ts: "1.2", thread_ts: "1.0"))
+      sleep 100.milliseconds
+
+      agent.invocations.size.should eq(2)
+      agent.max_concurrent.should eq(1)
+      agent.invocations[0][0].should contain("earlier")
+      agent.invocations[1][0].should eq("second")
     end
 
     it "ignores bot's own messages" do
