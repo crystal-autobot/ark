@@ -52,7 +52,12 @@ module Ark
       Signal::{{ signal.id }}.trap { shutdown.send(nil) }
     {% end %}
 
-    spawn { gateway.run }
+    spawn do
+      gateway.run
+    rescue ex
+      Log.fatal(exception: ex) { "gateway terminated unexpectedly" }
+      exit 1
+    end
 
     shutdown.receive
     gateway.stop
