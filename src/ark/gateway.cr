@@ -53,12 +53,22 @@ module Ark
       thread_ts = thread_timestamp(event["thread_ts"]?.try(&.as_s?), ts)
 
       text = (event["text"]?.try(&.as_s?) || "").strip
-      slack_files = event["files"]?.try(&.as_a)
-      has_files = slack_files && !slack_files.empty?
+      slack_files = event["files"]?.try(&.as_a) || [] of JSON::Any
 
-      return if text.empty? && !has_files
+      return if text.empty? && slack_files.empty?
 
-      files, skipped = slack_files && has_files ? download_slack_files(slack_files) : {[] of Bedrock::InputFile, 0}
+      spawn { respond_to_dm(user, channel, ts, thread_ts, text, slack_files) }
+    end
+
+    private def respond_to_dm(
+      user : String,
+      channel : String,
+      ts : String,
+      thread_ts : String,
+      text : String,
+      slack_files : Array(JSON::Any),
+    ) : Nil
+      files, skipped = download_slack_files(slack_files)
 
       if skipped > 0
         spawn { @slack_api.post_message(channel, Slack::UNSUPPORTED_FILE_REPLY_TEXT, thread_ts) }
@@ -68,7 +78,7 @@ module Ark
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
 
-      spawn { throttled_respond(user, channel, text, thread_ts, thread_ts, files) }
+      throttled_respond(user, channel, text, thread_ts, thread_ts, files)
     end
 
     private def valid_dm?(event : JSON::Any) : Bool

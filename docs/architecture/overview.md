@@ -27,7 +27,7 @@ The central orchestrator. Receives events from Socket Mode, routes them to the a
 Manages the WebSocket lifecycle: calls `apps.connections.open` to get a WSS URL, connects, handles reconnection with backoff, and acknowledges envelopes.
 
 ### `Ark::Slack::Client`
-Wraps the Slack Web API: `auth.test`, `chat.postMessage`, `reactions.add`, `users.info`, `conversations.replies`, and `files.uploadV2`.
+Wraps the Slack Web API: `auth.test`, `chat.postMessage`, `reactions.add`, `users.info`, `conversations.replies`, and `files.uploadV2`. Also downloads message attachments from Slack over HTTPS with the bot token.
 
 ### `Ark::HTTPTransport`
 Performs one-shot HTTP requests with connect, read and write timeouts and closes the connection afterwards. All Slack Web API calls go through it, so a stalled connection raises an error instead of blocking a request forever.

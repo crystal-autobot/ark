@@ -140,6 +140,21 @@ private def dm_event(user : String, text : String, ts : String = "1234.5678", th
   JSON::Any.new({"event" => JSON::Any.new(event)})
 end
 
+private def slack_file(name : String, url : String = "https://files.slack.com/files-pri/T1-F1/download/file") : JSON::Any
+  JSON::Any.new({
+    "name"                 => JSON::Any.new(name),
+    "size"                 => JSON::Any.new(8_i64),
+    "url_private_download" => JSON::Any.new(url),
+  } of String => JSON::Any)
+end
+
+private def dm_file_event(user : String, text : String, files : Array(JSON::Any)) : JSON::Any
+  payload = dm_event(user, text)
+  payload["event"].as_h["subtype"] = JSON::Any.new("file_share")
+  payload["event"].as_h["files"] = JSON::Any.new(files)
+  payload
+end
+
 private def thread_message(user : String, text : String) : JSON::Any
   JSON::Any.new({
     "user" => JSON::Any.new(user),
@@ -263,6 +278,45 @@ describe Ark::Gateway do
 
       agent.invocations.size.should eq(1)
       agent.invocations[0][1].should eq("1.1")
+    end
+  end
+
+  describe "DM attachments" do
+    it "downloads attachments outside the event handler" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+
+      socket_mode.simulate_event(dm_file_event("U999", "analyse this", [slack_file("data.csv")]))
+
+      slack_api.downloads.should be_empty
+
+      3.times { Fiber.yield }
+
+      slack_api.downloads.size.should eq(1)
+      agent.invocations.size.should eq(1)
+      agent.invocations[0][3].map(&.name).should eq(["data.csv"])
+      slack_api.reactions.size.should eq(1)
+    end
+
+    it "tells the user when a file type is not supported" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+
+      socket_mode.simulate_event(dm_file_event("U999", "", [slack_file("photo.png")]))
+      3.times { Fiber.yield }
+
+      slack_api.messages.map(&.[1]).should eq([Ark::Slack::UNSUPPORTED_FILE_REPLY_TEXT])
+      slack_api.downloads.should be_empty
+      agent.invocations.should be_empty
+    end
+
+    it "ignores a file-only message when the download fails" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.download_result = nil
+
+      socket_mode.simulate_event(dm_file_event("U999", "", [slack_file("data.csv")]))
+      3.times { Fiber.yield }
+
+      agent.invocations.should be_empty
+      slack_api.reactions.should be_empty
     end
   end
 
