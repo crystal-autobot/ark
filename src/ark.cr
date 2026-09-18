@@ -1,4 +1,5 @@
 require "./ark/config"
+require "./ark/http_transport"
 require "./ark/aws/*"
 require "./ark/aws/credential_sources/*"
 require "./ark/bedrock/*"
