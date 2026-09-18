@@ -127,7 +127,13 @@ private def build_gateway
   {gateway, slack_api, socket_mode, agent, publisher}
 end
 
-private def dm_event(user : String, text : String, ts : String = "1234.5678", thread_ts : String? = nil) : JSON::Any
+private def dm_event(
+  user : String,
+  text : String,
+  ts : String = "1234.5678",
+  thread_ts : String? = nil,
+  files : Array(JSON::Any)? = nil,
+) : JSON::Any
   event = {
     "type"         => JSON::Any.new("message"),
     "user"         => JSON::Any.new(user),
@@ -137,22 +143,19 @@ private def dm_event(user : String, text : String, ts : String = "1234.5678", th
     "ts"           => JSON::Any.new(ts),
   } of String => JSON::Any
   event["thread_ts"] = JSON::Any.new(thread_ts) if thread_ts
+  if files
+    event["subtype"] = JSON::Any.new("file_share")
+    event["files"] = JSON::Any.new(files)
+  end
   JSON::Any.new({"event" => JSON::Any.new(event)})
 end
 
-private def slack_file(name : String, url : String = "https://files.slack.com/files-pri/T1-F1/download/file") : JSON::Any
+private def slack_file(name : String) : JSON::Any
   JSON::Any.new({
     "name"                 => JSON::Any.new(name),
     "size"                 => JSON::Any.new(8_i64),
-    "url_private_download" => JSON::Any.new(url),
+    "url_private_download" => JSON::Any.new("https://files.slack.com/files-pri/T1-F1/download/file"),
   } of String => JSON::Any)
-end
-
-private def dm_file_event(user : String, text : String, files : Array(JSON::Any)) : JSON::Any
-  payload = dm_event(user, text)
-  payload["event"].as_h["subtype"] = JSON::Any.new("file_share")
-  payload["event"].as_h["files"] = JSON::Any.new(files)
-  payload
 end
 
 private def thread_message(user : String, text : String) : JSON::Any
@@ -285,7 +288,7 @@ describe Ark::Gateway do
     it "downloads attachments outside the event handler" do
       _, slack_api, socket_mode, agent, _ = build_gateway
 
-      socket_mode.simulate_event(dm_file_event("U999", "analyse this", [slack_file("data.csv")]))
+      socket_mode.simulate_event(dm_event("U999", "analyse this", files: [slack_file("data.csv")]))
 
       slack_api.downloads.should be_empty
 
@@ -300,7 +303,7 @@ describe Ark::Gateway do
     it "tells the user when a file type is not supported" do
       _, slack_api, socket_mode, agent, _ = build_gateway
 
-      socket_mode.simulate_event(dm_file_event("U999", "", [slack_file("photo.png")]))
+      socket_mode.simulate_event(dm_event("U999", "", files: [slack_file("photo.png")]))
       3.times { Fiber.yield }
 
       slack_api.messages.map(&.[1]).should eq([Ark::Slack::UNSUPPORTED_FILE_REPLY_TEXT])
@@ -312,7 +315,7 @@ describe Ark::Gateway do
       _, slack_api, socket_mode, agent, _ = build_gateway
       slack_api.download_result = nil
 
-      socket_mode.simulate_event(dm_file_event("U999", "", [slack_file("data.csv")]))
+      socket_mode.simulate_event(dm_event("U999", "", files: [slack_file("data.csv")]))
       3.times { Fiber.yield }
 
       agent.invocations.should be_empty
