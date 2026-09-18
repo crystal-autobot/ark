@@ -8,10 +8,12 @@ class MockSlackAPI < Ark::Slack::SlackAPI
   getter block_messages = [] of {String, Array(JSON::Any), String, String?}
   getter uploaded_files = [] of {String, String, String, Bytes}
   getter user_info_calls = [] of String
+  getter downloads = [] of String
 
   property bot_user_id = "UBOT"
   property user_info_result = Ark::Slack::UserInfo.new
   property block_post_should_raise = false
+  property download_result : Bytes? = "a,b\n1,2".to_slice
 
   def auth_test : String
     @bot_user_id
@@ -37,6 +39,11 @@ class MockSlackAPI < Ark::Slack::SlackAPI
 
   def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
     @uploaded_files << {channel, thread_ts, name, data}
+  end
+
+  def download_file(url : String) : Bytes?
+    @downloads << url
+    @download_result
   end
 
   property thread_replies = [] of JSON::Any
@@ -112,7 +119,6 @@ private def build_gateway
     socket_mode: socket_mode,
     agent: agent,
     publisher: publisher,
-    bot_token: "xoxb-fake",
   )
 
   # Trigger auth_test to set bot_user_id
@@ -121,7 +127,13 @@ private def build_gateway
   {gateway, slack_api, socket_mode, agent, publisher}
 end
 
-private def dm_event(user : String, text : String, ts : String = "1234.5678", thread_ts : String? = nil) : JSON::Any
+private def dm_event(
+  user : String,
+  text : String,
+  ts : String = "1234.5678",
+  thread_ts : String? = nil,
+  files : Array(JSON::Any)? = nil,
+) : JSON::Any
   event = {
     "type"         => JSON::Any.new("message"),
     "user"         => JSON::Any.new(user),
@@ -131,7 +143,19 @@ private def dm_event(user : String, text : String, ts : String = "1234.5678", th
     "ts"           => JSON::Any.new(ts),
   } of String => JSON::Any
   event["thread_ts"] = JSON::Any.new(thread_ts) if thread_ts
+  if files
+    event["subtype"] = JSON::Any.new("file_share")
+    event["files"] = JSON::Any.new(files)
+  end
   JSON::Any.new({"event" => JSON::Any.new(event)})
+end
+
+private def slack_file(name : String) : JSON::Any
+  JSON::Any.new({
+    "name"                 => JSON::Any.new(name),
+    "size"                 => JSON::Any.new(8_i64),
+    "url_private_download" => JSON::Any.new("https://files.slack.com/files-pri/T1-F1/download/file"),
+  } of String => JSON::Any)
 end
 
 private def thread_message(user : String, text : String) : JSON::Any
@@ -257,6 +281,45 @@ describe Ark::Gateway do
 
       agent.invocations.size.should eq(1)
       agent.invocations[0][1].should eq("1.1")
+    end
+  end
+
+  describe "DM attachments" do
+    it "downloads attachments outside the event handler" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+
+      socket_mode.simulate_event(dm_event("U999", "analyse this", files: [slack_file("data.csv")]))
+
+      slack_api.downloads.should be_empty
+
+      3.times { Fiber.yield }
+
+      slack_api.downloads.size.should eq(1)
+      agent.invocations.size.should eq(1)
+      agent.invocations[0][3].map(&.name).should eq(["data.csv"])
+      slack_api.reactions.size.should eq(1)
+    end
+
+    it "tells the user when a file type is not supported" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+
+      socket_mode.simulate_event(dm_event("U999", "", files: [slack_file("photo.png")]))
+      3.times { Fiber.yield }
+
+      slack_api.messages.map(&.[1]).should eq([Ark::Slack::UNSUPPORTED_FILE_REPLY_TEXT])
+      slack_api.downloads.should be_empty
+      agent.invocations.should be_empty
+    end
+
+    it "ignores a file-only message when the download fails" do
+      _, slack_api, socket_mode, agent, _ = build_gateway
+      slack_api.download_result = nil
+
+      socket_mode.simulate_event(dm_event("U999", "", files: [slack_file("data.csv")]))
+      3.times { Fiber.yield }
+
+      agent.invocations.should be_empty
+      slack_api.reactions.should be_empty
     end
   end
 

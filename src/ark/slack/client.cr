@@ -26,6 +26,7 @@ module Ark::Slack
     abstract def post_blocks(channel : String, blocks : Array(JSON::Any), fallback_text : String, thread_ts : String? = nil) : Nil
     abstract def get_user_info(user_id : String) : UserInfo
     abstract def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
+    abstract def download_file(url : String) : Bytes?
     abstract def get_thread_replies(channel : String, ts : String, limit : Int32) : Array(JSON::Any)
   end
 
@@ -132,6 +133,32 @@ module Ark::Slack
       }.to_json)
     rescue ex
       Log.error(exception: ex) { "failed to upload file: #{name}" }
+    end
+
+    def download_file(url : String) : Bytes?
+      uri = URI.parse(url)
+      unless uri.scheme == "https" && uri.host.try(&.ends_with?(".slack.com"))
+        Log.warn { "file download rejected: not a slack HTTPS URL" }
+        return
+      end
+
+      resp = @transport.get(url, HTTP::Headers{"Authorization" => "Bearer #{@bot_token}"})
+
+      unless resp.success?
+        Log.warn { "file download failed: #{resp.status_code}" }
+        return
+      end
+
+      data = resp.body.to_slice
+      if data.size > MAX_INPUT_FILE_SIZE
+        Log.warn { "downloaded file exceeds size limit: #{data.size}" }
+        return
+      end
+
+      data
+    rescue ex
+      Log.warn(exception: ex) { "file download error" }
+      nil
     end
 
     private def api_post(method : String, body : Hash(String, String)? = nil) : HTTP::Client::Response

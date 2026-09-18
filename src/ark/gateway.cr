@@ -1,5 +1,3 @@
-require "http/client"
-
 module Ark
   class Gateway
     MAX_CONCURRENT_REQUESTS =  10
@@ -11,7 +9,6 @@ module Ark
       @socket_mode : Slack::SocketMode,
       @agent : Bedrock::AgentInvoker,
       @publisher : AWS::EventPublisher,
-      @bot_token : String,
       @session_ttl : Time::Span = DEFAULT_SESSION_TTL,
     )
       @bot_user_id = ""
@@ -56,12 +53,22 @@ module Ark
       thread_ts = thread_timestamp(event["thread_ts"]?.try(&.as_s?), ts)
 
       text = (event["text"]?.try(&.as_s?) || "").strip
-      slack_files = event["files"]?.try(&.as_a)
-      has_files = slack_files && !slack_files.empty?
+      slack_files = event["files"]?.try(&.as_a) || [] of JSON::Any
 
-      return if text.empty? && !has_files
+      return if text.empty? && slack_files.empty?
 
-      files, skipped = slack_files && has_files ? download_slack_files(slack_files) : {[] of Bedrock::InputFile, 0}
+      spawn { respond_to_dm(user, channel, ts, thread_ts, text, slack_files) }
+    end
+
+    private def respond_to_dm(
+      user : String,
+      channel : String,
+      ts : String,
+      thread_ts : String,
+      text : String,
+      slack_files : Array(JSON::Any),
+    ) : Nil
+      files, skipped = download_slack_files(slack_files)
 
       if skipped > 0
         spawn { @slack_api.post_message(channel, Slack::UNSUPPORTED_FILE_REPLY_TEXT, thread_ts) }
@@ -71,7 +78,7 @@ module Ark
 
       spawn { @slack_api.add_reaction(channel, ts, Slack::REACTION_PROCESSING) }
 
-      spawn { throttled_respond(user, channel, text, thread_ts, thread_ts, files) }
+      throttled_respond(user, channel, text, thread_ts, thread_ts, files)
     end
 
     private def valid_dm?(event : JSON::Any) : Bool
@@ -259,43 +266,13 @@ module Ark
           next
         end
 
-        data = fetch_file_bytes(url)
+        data = @slack_api.download_file(url)
         next unless data
 
         files << Bedrock::InputFile.new(name: name, media_type: media_type, data: data)
       end
 
       {files, skipped}
-    end
-
-    private def fetch_file_bytes(url : String) : Bytes?
-      uri = URI.parse(url)
-      unless uri.scheme == "https" && uri.host.try(&.ends_with?(".slack.com"))
-        Log.warn { "file download rejected: not a slack HTTPS URL" }
-        return
-      end
-
-      client = HTTP::Client.new(uri)
-      client.read_timeout = Slack::FILE_DOWNLOAD_TIMEOUT
-
-      headers = HTTP::Headers{"Authorization" => "Bearer #{@bot_token}"}
-      resp = client.get(uri.request_target, headers: headers)
-
-      unless resp.success?
-        Log.warn { "file download failed: #{resp.status_code}" }
-        return
-      end
-
-      data = resp.body.to_slice
-      if data.size > Slack::MAX_INPUT_FILE_SIZE
-        Log.warn { "downloaded file exceeds size limit: #{data.size}" }
-        return
-      end
-
-      data
-    rescue ex
-      Log.warn(exception: ex) { "file download error" }
-      nil
     end
   end
 end

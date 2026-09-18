@@ -50,4 +50,37 @@ describe Ark::Slack::Client do
     ])
     transport.calls[1].body.should eq(data)
   end
+
+  describe "#download_file" do
+    it "downloads from Slack with the bot token" do
+      url = "https://files.slack.com/files-pri/T1-F1/download/data.csv"
+      transport = MockHTTPTransport.new
+      transport.responder = ->(_call : MockHTTPTransport::Call) { HTTP::Client::Response.new(200, "a,b\n1,2") }
+
+      data = Ark::Slack::Client.new(BOT_TOKEN, transport).download_file(url)
+
+      data.should eq("a,b\n1,2".to_slice)
+      call = transport.calls.first
+      call.method.should eq("GET")
+      call.url.should eq(url)
+      call.headers.try(&.["Authorization"]?).should eq("Bearer #{BOT_TOKEN}")
+    end
+
+    it "refuses URLs outside Slack without sending the token" do
+      transport = MockHTTPTransport.new
+      client = Ark::Slack::Client.new(BOT_TOKEN, transport)
+
+      client.download_file("https://evil.example/data.csv").should be_nil
+      client.download_file("http://files.slack.com/data.csv").should be_nil
+      transport.calls.should be_empty
+    end
+
+    it "returns nil when Slack rejects the download" do
+      transport = MockHTTPTransport.new
+      transport.responder = ->(_call : MockHTTPTransport::Call) { HTTP::Client::Response.new(403, "forbidden") }
+
+      client = Ark::Slack::Client.new(BOT_TOKEN, transport)
+      client.download_file("https://files.slack.com/files-pri/T1-F1/download/data.csv").should be_nil
+    end
+  end
 end
