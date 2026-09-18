@@ -35,7 +35,7 @@ module Ark::Slack
     DEFAULT_RETRY   = 1.seconds
     RATE_LIMIT_CODE = 429
 
-    def initialize(@bot_token : String)
+    def initialize(@bot_token : String, @transport : HTTPTransport = HTTPTransport.new)
     end
 
     def auth_test : String
@@ -122,7 +122,7 @@ module Ark::Slack
       file_id = json["file_id"].as_s
 
       # Step 2: upload file content
-      HTTP::Client.post(upload_url, body: data)
+      @transport.post(upload_url, body: data)
 
       # Step 3: complete upload
       api_post_json("files.completeUploadExternal", {
@@ -140,11 +140,7 @@ module Ark::Slack
         "Content-Type"  => "application/json; charset=utf-8",
       }
       with_rate_limit do
-        HTTP::Client.post(
-          "#{API_BASE}/#{method}",
-          headers: headers,
-          body: (body || {} of String => String).to_json,
-        )
+        @transport.post("#{API_BASE}/#{method}", headers, (body || {} of String => String).to_json)
       end
     end
 
@@ -154,7 +150,7 @@ module Ark::Slack
         "Content-Type"  => "application/json; charset=utf-8",
       }
       with_rate_limit do
-        HTTP::Client.post("#{API_BASE}/#{method}", headers: headers, body: body)
+        @transport.post("#{API_BASE}/#{method}", headers, body)
       end
     end
 
@@ -162,7 +158,7 @@ module Ark::Slack
       query = URI::Params.encode(params)
       headers = HTTP::Headers{"Authorization" => "Bearer #{@bot_token}"}
       with_rate_limit do
-        HTTP::Client.get("#{API_BASE}/#{method}?#{query}", headers: headers)
+        @transport.get("#{API_BASE}/#{method}?#{query}", headers)
       end
     end
 
