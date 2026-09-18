@@ -24,7 +24,7 @@ graph LR
 The central orchestrator. Receives events from Socket Mode, routes them to the appropriate handler, invokes the Bedrock agent, and posts responses back to Slack.
 
 ### `Ark::Slack::SocketMode`
-Manages the WebSocket lifecycle: calls `apps.connections.open` to get a WSS URL, connects, handles reconnection with backoff, and acknowledges envelopes.
+Manages the WebSocket lifecycle: calls `apps.connections.open` to get a WSS URL, connects, handles reconnection with backoff, and acknowledges envelopes. A heartbeat pings Slack every 10 seconds and closes the connection when nothing has been received for 30 seconds, so a silently dead connection is replaced instead of leaving the gateway deaf.
 
 ### `Ark::Slack::Client`
 Wraps the Slack Web API: `auth.test`, `chat.postMessage`, `reactions.add`, `users.info`, `conversations.replies`, and `files.uploadV2`.
