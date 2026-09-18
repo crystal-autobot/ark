@@ -1,5 +1,3 @@
-require "http/client"
-
 module Ark
   class Gateway
     MAX_CONCURRENT_REQUESTS =  10
@@ -11,7 +9,6 @@ module Ark
       @socket_mode : Slack::SocketMode,
       @agent : Bedrock::AgentInvoker,
       @publisher : AWS::EventPublisher,
-      @bot_token : String,
       @session_ttl : Time::Span = DEFAULT_SESSION_TTL,
     )
       @bot_user_id = ""
@@ -259,43 +256,13 @@ module Ark
           next
         end
 
-        data = fetch_file_bytes(url)
+        data = @slack_api.download_file(url)
         next unless data
 
         files << Bedrock::InputFile.new(name: name, media_type: media_type, data: data)
       end
 
       {files, skipped}
-    end
-
-    private def fetch_file_bytes(url : String) : Bytes?
-      uri = URI.parse(url)
-      unless uri.scheme == "https" && uri.host.try(&.ends_with?(".slack.com"))
-        Log.warn { "file download rejected: not a slack HTTPS URL" }
-        return
-      end
-
-      client = HTTP::Client.new(uri)
-      client.read_timeout = Slack::FILE_DOWNLOAD_TIMEOUT
-
-      headers = HTTP::Headers{"Authorization" => "Bearer #{@bot_token}"}
-      resp = client.get(uri.request_target, headers: headers)
-
-      unless resp.success?
-        Log.warn { "file download failed: #{resp.status_code}" }
-        return
-      end
-
-      data = resp.body.to_slice
-      if data.size > Slack::MAX_INPUT_FILE_SIZE
-        Log.warn { "downloaded file exceeds size limit: #{data.size}" }
-        return
-      end
-
-      data
-    rescue ex
-      Log.warn(exception: ex) { "file download error" }
-      nil
     end
   end
 end

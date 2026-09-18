@@ -40,7 +40,6 @@ module Ark
       socket_mode: socket_mode,
       agent: agent,
       publisher: publisher,
-      bot_token: config.slack_bot_token,
       session_ttl: config.session_ttl_minutes.minutes,
     )
 

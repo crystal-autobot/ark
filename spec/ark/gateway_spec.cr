@@ -8,10 +8,12 @@ class MockSlackAPI < Ark::Slack::SlackAPI
   getter block_messages = [] of {String, Array(JSON::Any), String, String?}
   getter uploaded_files = [] of {String, String, String, Bytes}
   getter user_info_calls = [] of String
+  getter downloads = [] of String
 
   property bot_user_id = "UBOT"
   property user_info_result = Ark::Slack::UserInfo.new
   property block_post_should_raise = false
+  property download_result : Bytes? = "a,b\n1,2".to_slice
 
   def auth_test : String
     @bot_user_id
@@ -37,6 +39,11 @@ class MockSlackAPI < Ark::Slack::SlackAPI
 
   def upload_file(channel : String, thread_ts : String, name : String, data : Bytes) : Nil
     @uploaded_files << {channel, thread_ts, name, data}
+  end
+
+  def download_file(url : String) : Bytes?
+    @downloads << url
+    @download_result
   end
 
   property thread_replies = [] of JSON::Any
@@ -112,7 +119,6 @@ private def build_gateway
     socket_mode: socket_mode,
     agent: agent,
     publisher: publisher,
-    bot_token: "xoxb-fake",
   )
 
   # Trigger auth_test to set bot_user_id
