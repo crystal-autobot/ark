@@ -29,6 +29,9 @@ Manages the WebSocket lifecycle: calls `apps.connections.open` to get a WSS URL,
 ### `Ark::Slack::Client`
 Wraps the Slack Web API: `auth.test`, `chat.postMessage`, `reactions.add`, `users.info`, `conversations.replies`, and `files.uploadV2`.
 
+### `Ark::HTTPTransport`
+Performs one-shot HTTP requests with connect, read and write timeouts and closes the connection afterwards. All Slack Web API calls go through it, so a stalled connection raises an error instead of blocking a request forever.
+
 ### `Ark::Slack::ThreadContext`
 Formats Slack thread history into a character-budgeted context string for injection into Bedrock when a session has expired.
 

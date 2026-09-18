@@ -9,7 +9,7 @@ module Ark::Slack
     @running = true
     @ws : HTTP::WebSocket?
 
-    def initialize(@app_token : String)
+    def initialize(@app_token : String, @transport : HTTPTransport = HTTPTransport.new)
     end
 
     def run(&handler : JSON::Any ->) : Nil
@@ -49,7 +49,7 @@ module Ark::Slack
 
     private def open_connection : String
       headers = HTTP::Headers{"Authorization" => "Bearer #{@app_token}"}
-      resp = HTTP::Client.post("#{API_BASE}/apps.connections.open", headers: headers)
+      resp = @transport.post("#{API_BASE}/apps.connections.open", headers)
       json = JSON.parse(resp.body)
 
       unless json["ok"]?.try(&.as_bool?)
